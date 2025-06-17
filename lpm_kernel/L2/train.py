@@ -240,30 +240,27 @@ def main(model_args, data_args, training_args):
     training_args = memory_manager.optimize_training_args(training_args)
 
     # --- Accelerate optimizer state offloading logic ---
-    # Enable optimizer state offload to CPU if VRAM is low and not using DeepSpeed
+    # Enable optimizer state offload to CPU if VRAM is low
     vram_total = memory_manager.get_memory_info().get("vram_total_gb", 0)
     use_accelerate_offload = False
     if torch.cuda.is_available() and model_args.use_cuda and vram_total > 0 and vram_total < 16:
-        # Only set if not already using DeepSpeed
-        if not hasattr(training_args, "deepspeed") or training_args.deepspeed is None:
-            logger.info("Enabling Hugging Face Accelerate optimizer state offload to CPU for low VRAM GPUs")
-            accelerate_config = {
-                "compute_environment": "LOCAL_MACHINE",
-                "deepspeed_config": None,
-                "distributed_type": "NO",
-                "downcast_bf16": False,
-                "fsdp_config": {},
-                "main_training_function": "main",
-                "mixed_precision": "no",
-                "num_machines": 1,
-                "num_processes": 1,
-                "use_cpu": False,
-                "zero3_init_flag": False,
-                "offload_optimizer_device": "cpu",
-                "offload_param_device": "none"
-            }
-            training_args.accelerate_config = accelerate_config
-            use_accelerate_offload = True
+        logger.info("Enabling Hugging Face Accelerate optimizer state offload to CPU for low VRAM GPUs")
+        accelerate_config = {
+            "compute_environment": "LOCAL_MACHINE",
+            "distributed_type": "NO",
+            "downcast_bf16": False,
+            "fsdp_config": {},
+            "main_training_function": "main",
+            "mixed_precision": "no",
+            "num_machines": 1,
+            "num_processes": 1,
+            "use_cpu": False,
+            "zero3_init_flag": False,
+            "offload_optimizer_device": "cpu",
+            "offload_param_device": "none"
+        }
+        training_args.accelerate_config = accelerate_config
+        use_accelerate_offload = True
 
     # Model loading with device_map="auto" for automatic offloading
     logger.info(f"Loading model with automatic memory management from {model_args.model_name_or_path}")
@@ -309,13 +306,19 @@ def main(model_args, data_args, training_args):
     model, peft_config, tokenizer = create_and_prepare_model(
         model_args, data_args, training_args, model_kwargs=model_kwargs
     )
-    
-    # If model has meta tensors, handle them properly
-    if hasattr(model, "is_meta") and model.is_meta:
-        logger.info("Model has meta tensors, using to_empty() to properly initialize")
+
+    # Robustly check for meta tensors and handle them
+    def has_meta_tensors(model):
+        return any(
+            (hasattr(p, 'device') and getattr(p, 'device', None) is not None and getattr(p, 'device').type == 'meta')
+            for p in list(model.parameters()) + list(model.buffers())
+        )
+
+    if has_meta_tensors(model):
+        logger.info("Model has parameters on meta device, using to_empty() to properly initialize")
         device = "cuda" if torch.cuda.is_available() and model_args.use_cuda else "cpu"
         model = model.to_empty(device=device)
-    
+
     # Apply gradient checkpointing for memory efficiency
     if training_args.gradient_checkpointing and hasattr(model, "gradient_checkpointing_enable"):
         logger.info("Enabling gradient checkpointing for memory efficiency")
@@ -342,45 +345,22 @@ def main(model_args, data_args, training_args):
         "add_special_tokens": data_args.add_special_tokens,
     }
 
-    # Use DeepSpeed to handle meta tensors if available
-    try:
-        # Only configure DeepSpeed if meta tensors are present and DeepSpeed is available
-        if hasattr(model, "is_meta") and model.is_meta:
-            logger.info("Model has meta tensors, checking DeepSpeed availability")
-            # First verify DeepSpeed is properly installed and importable
-            try:
-                import deepspeed
-                logger.info("DeepSpeed is available, configuring for meta tensor handling")
-                
-                # Configure with appropriate settings for meta tensors
-                training_args.deepspeed = {
-                    "zero_stage": 3,
-                    "offload_optimizer": {
-                        "device": "cpu"
-                    },
-                    "offload_param": {
-                        "device": "cpu"
-                    },
-                    "zero3_init_flag": True,
-                    "zero_force_ds_cpu_optimizer": False
-                }
-                logger.info("DeepSpeed configured for meta tensor handling")
-            except ImportError:
-                logger.warning("DeepSpeed is not available, meta tensors will be handled differently")
-                # If DeepSpeed isn't available, use alternative approach to handle meta tensors
-                if torch.cuda.is_available() and model_args.use_cuda:
-                    logger.info("Initializing meta tensors on GPU")
-                    # Use device_map instead of DeepSpeed for meta tensor initialization
-                    from accelerate import init_empty_weights
-                    with init_empty_weights():
-                        model.to_empty(device="cuda")
-                else:
-                    logger.info("Initializing meta tensors on CPU")
-                    model.to_empty(device="cpu")
-    except Exception as e:
-        logger.warning(f"Could not configure meta tensor handling: {e}")
-        logger.warning(traceback.format_exc())
-
+    if hasattr(model, "is_meta") and model.is_meta:
+        logger.info("Model has meta tensors, initializing properly")
+        try:
+            # Initialize meta tensors on appropriate device
+            if torch.cuda.is_available() and model_args.use_cuda:
+                logger.info("Initializing meta tensors on GPU")
+                from accelerate import init_empty_weights
+                with init_empty_weights():
+                    model.to_empty(device="cuda")
+            else:
+                logger.info("Initializing meta tensors on CPU")
+                model.to_empty(device="cpu")
+        except Exception as e:
+            logger.warning(f"Could not initialize meta tensors: {e}")
+            logger.warning(traceback.format_exc())
+    
     trainer = SFTTrainer(
         model=model,
         tokenizer=tokenizer,

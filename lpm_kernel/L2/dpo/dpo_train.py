@@ -2,10 +2,16 @@ import json
 import argparse
 import torch
 
-from transformers import AutoTokenizer, AutoModelForCausalLM
+try:
+    from unsloth import FastLanguageModel, FastTokenizer
+    UNSLOTH_AVAILABLE = True
+except ImportError:
+    from transformers import AutoTokenizer, AutoModelForCausalLM
+    UNSLOTH_AVAILABLE = False
+
 from datasets import Dataset
 from trl import DPOConfig, DPOTrainer
-from peft import LoraConfig, AutoPeftModelForCausalLM, get_peft_model
+from peft import LoraConfig
 from datetime import datetime, timedelta
 # from clearml import Task
 
@@ -20,6 +26,19 @@ def get_east_eight_time_formatted():
 
 # task = Task.init(project_name="mind_dpo", task_name="qwen25-instruct-" + get_east_eight_time_formatted())
 
+def get_supported_dtype():
+    # Try bf16, fallback to f16
+    if torch.cuda.is_available():
+        if torch.cuda.is_bf16_supported():
+            return torch.bfloat16, "bfloat16"
+        else:
+            return torch.float16, "float16"
+    try:
+        _ = torch.zeros(1, dtype=torch.bfloat16)
+        return torch.bfloat16, "bfloat16"
+    except Exception:
+        return torch.float16, "float16"
+
 def training_data_processor(args, SYS = "You are a helpful assistant.\n\n"):
     with open(args.training_data_path, "r", encoding="utf-8") as f:
         data = json.load(f)
@@ -33,7 +52,10 @@ def training_data_processor(args, SYS = "You are a helpful assistant.\n\n"):
         "chosen": [data_point["chosen"] for data_point in data],
         "rejected": [data_point["rejected"] for data_point in data]
     }
-    tokenizer = AutoTokenizer.from_pretrained(args.base_model_path, padding_side="left")
+    if UNSLOTH_AVAILABLE:
+        tokenizer = FastTokenizer.from_pretrained(args.base_model_path, padding_side="left")
+    else:
+        tokenizer = AutoTokenizer.from_pretrained(args.base_model_path, padding_side="left")
     training_data = {
         "prompt": tokenizer.apply_chat_template(training_data["prompt"], tokenize=False),
         "chosen": training_data["chosen"],
@@ -42,31 +64,59 @@ def training_data_processor(args, SYS = "You are a helpful assistant.\n\n"):
     return training_data
 
 def train(args):
-    tokenizer = AutoTokenizer.from_pretrained(args.base_model_path, padding_side="left")
-    model = AutoModelForCausalLM.from_pretrained(
-    args.base_model_path, 
-    trust_remote_code=True,
-    ignore_mismatched_sizes=True, 
-    torch_dtype=torch.float32,  # CPU doesn't support bfloat16
-)
+    dtype, dtype_str = get_supported_dtype()
+    if UNSLOTH_AVAILABLE:
+        tokenizer = FastTokenizer.from_pretrained(args.base_model_path, padding_side="left")
+        model = FastLanguageModel.from_pretrained(
+            model_name=args.base_model_path,
+            dtype=dtype_str,
+            load_in_4bit=False,
+            load_in_8bit=False,
+            device_map="auto" if torch.cuda.is_available() else "cpu"
+        )
+        # Apply LoRA with Unsloth's optimized method if requested
+        if args.lora_r > 0:
+            model = FastLanguageModel.get_peft_model(
+                model,
+                lora_alpha=args.lora_alpha,
+                lora_dropout=args.lora_dropout,
+                r=args.lora_r,
+                target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+                use_gradient_checkpointing=False,
+                random_state=42,
+                max_seq_length=args.max_length,
+            )
+        # Use FastDPOTrainer if available, else fallback
+        try:
+            from unsloth import FastDPOTrainer as DPOTrainerImpl
+        except ImportError:
+            from trl import DPOTrainer as DPOTrainerImpl
+    else:
+        tokenizer = AutoTokenizer.from_pretrained(args.base_model_path, padding_side="left")
+        model = AutoModelForCausalLM.from_pretrained(
+            args.base_model_path, 
+            trust_remote_code=True,
+            ignore_mismatched_sizes=True, 
+            torch_dtype=dtype,
+        )
+        DPOTrainerImpl = DPOTrainer
     time_str = get_east_eight_time_formatted()
-
-    # merged_model = model.merge_and_unload()
-    # merged_model.save_pretrained(merged_model)
 
     data_dict = training_data_processor(args)
     dataset = Dataset.from_dict(data_dict)
 
-    if args.lora_r == 0:
-        lora_config = None
-    else:
+    # Only use LoRA config for non-Unsloth
+    lora_config = None
+    if not UNSLOTH_AVAILABLE and args.lora_r > 0:
         lora_config = LoraConfig(
             r=args.lora_r,
             lora_alpha=args.lora_alpha,
             lora_dropout=args.lora_dropout,
             bias="none",
-            target_modules="all-linear",
+            target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
             task_type="CAUSAL_LM",
+            inference_mode=False,
+            fan_in_fan_out=False
         )
 
     training_args = DPOConfig(
@@ -93,7 +143,7 @@ def train(args):
         beta=args.beta,
     )
 
-    dpo_trainer = DPOTrainer(
+    dpo_trainer = DPOTrainerImpl(
         model,
         tokenizer=tokenizer,
         args=training_args,
@@ -102,7 +152,6 @@ def train(args):
     )
 
     dpo_trainer.train()
-    
     dpo_trainer.save_model()
 
 
@@ -126,13 +175,9 @@ if __name__ == "__main__":
     parser.add_argument('--beta', type=float, default=0.1)
     
     # LoRA arguments
-    parser.add_argument('--lora_r', type=int, default=64)
-    parser.add_argument('--lora_alpha', type=int, default=128)
-    parser.add_argument('--lora_dropout', type=float, default=0.1)
-
-    # DeepSpeed arguments
-    parser.add_argument('--deepspeed', type=str, default=None)
-    parser.add_argument('--local_rank', type=int, default=-1)
+    parser.add_argument('--lora_r', type=int, default=16)
+    parser.add_argument('--lora_alpha', type=int, default=16)
+    parser.add_argument('--lora_dropout', type=float, default=0.0)
 
     args = parser.parse_args()
     
