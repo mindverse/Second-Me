@@ -38,6 +38,8 @@ from .memory_manager import get_memory_manager
 import gc
 import requests
 
+progress_file = os.path.join(os.path.dirname(TRAIN_LOG_FILE), "train_progress.json")
+
 # Initialize the logger
 logger = logging.getLogger(__name__)
 
@@ -595,6 +597,15 @@ def setup_logger(log_path, logger_name="download_logger"):
     
     return logger
 
+def _write_progress_to_file(progress_data,progress_file):
+    try:
+        import json
+        with open(progress_file, 'w', encoding='utf-8') as f:
+            json_str = json.dumps(progress_data)
+            f.write(json_str)
+    except Exception as e:
+        logger.error(f"Error writing progress to file: {str(e)}")
+
 
 def save_hf_model(model_name=None, log_file_path=None) -> str:
     """Saves a Hugging Face model locally.
@@ -708,10 +719,21 @@ def save_hf_model(model_name=None, log_file_path=None) -> str:
                         if current % (1024 * 1024 * 10) < 8192:
                             if total and total > 0:
                                 percent = current / total * 100
+                                progress_data ={
+                                    "file_name": filename,
+                                    "file_size": total_size / 1024 / 1024 if total_size >0 else None,
+                                    "downloaded_mb": current/1024/1024,
+                                    "total_mb": total/1024/1024,
+                                    "percentage": percent,
+                                    "completed": False
+                                }
+                                _write_progress_to_file(progress_data, progress_file)
                                 logger.info(f"File {filename}: Downloaded {current/1024/1024:.2f} MB / {total/1024/1024:.2f} MB ({percent:.2f}%)")
+                                
                             else:
                                 logger.info(f"File {filename}: Downloaded {current/1024/1024:.2f} MB (total size unknown)")
-                
+
+
                     # Download file with progress tracking
                     response = requests.get(url, stream=True)
                     if response.status_code == 200:
@@ -789,6 +811,18 @@ def save_hf_model(model_name=None, log_file_path=None) -> str:
             logger.info(f"Model {model_name} downloaded with {file_count} files.")
         except Exception:
             logger.info(f"Download completed for model: {model_name}.")
+
+        progress_data = {
+            "file_name": "ALL_FILES",
+            "file_size": 100,
+            "downloaded_mb": 100,
+            "total_mb": 100,
+            "percentage": 100.0,
+            "completed": True,
+        }
+
+        _write_progress_to_file(progress_data, progress_file)
+            
     except requests.RequestException:
         try:
             from modelscope.hub.snapshot_download import snapshot_download

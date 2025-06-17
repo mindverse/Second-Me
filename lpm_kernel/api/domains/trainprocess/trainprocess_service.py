@@ -37,6 +37,7 @@ import gc
 import subprocess
 from lpm_kernel.configs.logging import get_train_process_logger, TRAIN_LOG_FILE
 logger = get_train_process_logger()
+progress_file = os.path.join(os.path.dirname(TRAIN_LOG_FILE), "train_progress.json")
 
 class TrainProcessService:
     """Training process service (singleton pattern)"""
@@ -828,86 +829,65 @@ class TrainProcessService:
                 last_position = 0
             
             # Variables to track download status
-            current_file = ""
+            file_name = ""
             file_size = 0
             total_size = 0  # Total size of all files
             file_sizes = {}  # Dictionary to store file sizes
             last_update_time = time.time()
+            completed = False
             
             while True:
-                try:
-                    # Read new log content
-                    with open(log_file, 'r') as f:
-                        f.seek(last_position)
-                        new_lines = f.readlines()
-                        last_position = f.tell()
-                    
-                    for line in new_lines:
-                        line = line.strip()
-                        
-                        # Check for download start
-                        if "Starting download of model:" in line:
-                            logger.info("Model download started")
-                            continue
-                        
-                        # Get file size information when a download starts
-                        if "Starting download of file:" in line:
-                            match = re.search(r"Starting download of file: (.+) \(Size: ([\d\.]+) MB\)", line)
-                            if match:
-                                current_file = match.group(1)
-                                file_size = float(match.group(2))
-                                file_sizes[current_file] = file_size
-                                total_size = sum(file_sizes.values())
-                                # logger.info(f"Starting download of {current_file} ({file_size} MB)")
-                        
-                        # Track file download progress
-                        if "Downloaded" in line and "MB /" in line:
-                            match = re.search(r"File (.+): Downloaded ([\d\.]+) MB / ([\d\.]+) MB \(([\d\.]+)%\)", line)
-                            if match:
-                                file_name = match.group(1)
-                                downloaded_mb = float(match.group(2))
-                                total_mb = float(match.group(3))
-                                percentage = float(match.group(4))
-                                
-                                # Update file size if it was updated (especially for model.safetensors)
-                                if total_mb > file_sizes.get(file_name, 0):
-                                    file_sizes[file_name] = total_mb
-                                    total_size = sum(file_sizes.values())
-                                
-                                # Calculate overall progress
-                                if total_size > 0:
-                                    # Sum up all downloaded data
-                                    completed_files_size = sum([file_sizes.get(f, 0) for f in file_sizes if f != file_name])
-                                    current_file_downloaded = (percentage / 100.0) * total_mb
-                                    overall_downloaded = completed_files_size + current_file_downloaded
-                                    current_progress = (overall_downloaded / total_size) * 100
-                                    current_progress = min(99.0, current_progress)  # Cap at 99% until fully complete
-                                    # Update progress at most once per second
-                                    current_time = time.time()
-                                    if current_time - last_update_time >= 3.0:
+                if os.path.exists(progress_file):
+                    try:
+                        import json
+                        with open(progress_file, 'r') as f:
+                            progress_data = json.load(f)
+                            file_name = progress_data.get("file_name")
+                            file_size = float(progress_data.get("file_size"))
+                            downloaded_mb = float(progress_data.get("downloaded_mb"))
+                            total_mb = float(progress_data.get("total_mb"))
+                            percentage = float(progress_data.get("percentage"))
+                            completed = progress_data.get("completed")
 
-                                        self._update_progress(
-                                            "downloading_the_base_model", 
-                                            "model_download", 
-                                            current_progress, 
-                                            f"Overall: {current_progress:.1f}% - Downloading {file_name}: {percentage}% ({downloaded_mb:.1f}/{total_mb:.1f} MB)",
-                                            file_name
-                                        )
-                                        last_update_time = current_time
+                    except Exception as e:
+                        logger.error(f"Error reading progress file: {str(e)}")
+                if completed:
+                    self.progress.mark_step_status(ProcessStep.MODEL_DOWNLOAD, Status.COMPLETED)
+                    logger.info("Model download completed")
+                    return True
 
-                        if "Model downloaded successfully" in line:
-                            self.progress.mark_step_status(ProcessStep.MODEL_DOWNLOAD, Status.COMPLETED)
-                            logger.info("Model download completed")
-                            return True
-                    
-                    # Briefly pause to avoid excessive CPU usage
-                    time.sleep(0.1)
-                    
-                except IOError as e:
-                    logger.error(f"Failed to read log file: {str(e)}")
-                    time.sleep(0.1)
-                    continue
-                    
+                file_sizes[file_name] = file_size
+                total_size = sum(file_sizes.values())
+
+                # Update file size if it was updated (especially for model.safetensors)
+                if total_mb > file_sizes.get(file_name, 0):
+                    file_sizes[file_name] = total_mb
+                    total_size = sum(file_sizes.values())
+
+                # Calculate overall progress
+                if total_size > 0:
+                    # Sum up all downloaded data
+                    completed_files_size = sum(
+                        [file_sizes.get(f, 0) for f in file_sizes if f != file_name])
+                    current_file_downloaded = (percentage / 100.0) * total_mb
+                    overall_downloaded = completed_files_size + current_file_downloaded
+                    current_progress = (overall_downloaded / total_size) * 100
+                    current_progress = min(99.0, current_progress)  # Cap at 99% until fully complete
+                    # Update progress at most once per second
+                    current_time = time.time()
+                    if current_time - last_update_time >= 3.0:
+                        self._update_progress(
+                            "downloading_the_base_model",
+                            "model_download",
+                            current_progress,
+                            f"Overall: {current_progress:.1f}% - Downloading {file_name}: {percentage}% ({downloaded_mb:.1f}/{total_mb:.1f} MB)",
+                            file_name
+                        )
+                        last_update_time = current_time
+
+                # Briefly pause to avoid excessive CPU usage
+                time.sleep(0.1)
+
         except Exception as e:
             logger.error(f"Failed to monitor model download progress: {str(e)}")
             return False
