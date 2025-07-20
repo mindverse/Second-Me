@@ -69,6 +69,7 @@ resources/model/output/gguf/*
 resources/L2/base_models/*
 logs/*.log
 logs/train/*.log
+*.log
 
 # Runtime files
 run/*
