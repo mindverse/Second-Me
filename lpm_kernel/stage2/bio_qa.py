@@ -115,8 +115,10 @@ class BioQAData(BaseData):
                 response = self.reasoning_client.chat.completions.create(
                     model=self.reasoning_model_name,
                     messages=messages,
-                    extra_body={"metadata": {"tags": ["lpm-pipeline-using"]}, "enable_thinking": True,
+                    extra_body={"enable_thinking": True,
                                 "thinking_budget": 300},
+                    # extra_body={"metadata": {"tags": "lpm-pipeline-using"}, "enable_thinking": True,
+                    #             "thinking_budget": 300},
                     stream=True
                 )
                 reasoning_content = ""

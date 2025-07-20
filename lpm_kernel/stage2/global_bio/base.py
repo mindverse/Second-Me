@@ -117,7 +117,7 @@ class GlobalBioV2():
         answer = llm.chat.completions.create(
             model=self.model_name,
             messages=global_bio_message,
-            extra_body={"metadata": {"tags": ["lpm_global_bio"]}},
+            # extra_body={"metadata": {"tags": "lpm_global_bio"}},
         )
         third_perspective_result = answer.choices[0].message.content
         raw_bio.summary_third_view = third_perspective_result
@@ -135,7 +135,7 @@ class GlobalBioV2():
         answer = llm.chat.completions.create(
             model=self.model_name,
             messages=shift_perspective_message,
-            extra_body={"metadata": {"tags": ["lpm_global_bio"]}},
+            # extra_body={"metadata": {"tags": "lpm_global_bio"}},
         )
         second_perspective_result = answer.choices[0].message.content
 

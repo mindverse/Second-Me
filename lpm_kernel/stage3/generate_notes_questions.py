@@ -233,9 +233,9 @@ class SyntheticDataGenerator:
                     {"role": "system", "content": prompt},
                 ],
                 response_format={"type": "json_object"},
-                extra_body={"metadata": {"tags": ["lpm-pipeline-using"]}},
                 max_tokens=max_tokens,
                 temperature=temperature
+                # extra_body={"metadata": {"tags": "lpm-pipeline-using"}},
             )
 
             generated_text = response.choices[0].message.content
@@ -269,9 +269,9 @@ class SyntheticDataGenerator:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                extra_body={"metadata": {"tags": ["lpm-pipeline-using"]}},
                 max_tokens=max_tokens,
                 temperature=temperature
+                # extra_body={"metadata": {"tags": "lpm-pipeline-using"}},
             )
 
             result = response.choices[0].message
