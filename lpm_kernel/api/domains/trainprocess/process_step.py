@@ -24,6 +24,7 @@ class ProcessStep(Enum):
     SYNTHETIC_DATA_GENERATION = "synthetic_data_generation"
     SYNTHETIC_NO_NOTES_DATA_GENERATION = "synthetic_no_notes_data_generation"
     CONVERT_DATA = "convert_data"
+    DATA_FILTERING = "data_filtering"
 
     TRAIN = "train"
     MERGE_WEIGHTS = "merge_weights"
@@ -51,6 +52,7 @@ class ProcessStep(Enum):
             cls.SYNTHETIC_DATA_GENERATION,
             cls.SYNTHETIC_NO_NOTES_DATA_GENERATION,
             cls.CONVERT_DATA,
+            cls.DATA_FILTERING,
             cls.TRAIN,
             cls.MERGE_WEIGHTS,
             cls.CONVERT_MODEL,

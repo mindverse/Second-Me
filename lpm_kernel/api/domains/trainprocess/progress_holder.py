@@ -53,6 +53,7 @@ class TrainProgressHolder:
             ProcessStep.SYNTHETIC_DATA_GENERATION: "memory_expansion",
             ProcessStep.SYNTHETIC_NO_NOTES_DATA_GENERATION: "memory_expansion",
             ProcessStep.CONVERT_DATA: "memory_expansion",
+            ProcessStep.DATA_FILTERING: "memory_expansion",
 
             ProcessStep.TRAIN: "training_to_create_second_me",
             ProcessStep.MERGE_WEIGHTS: "training_to_create_second_me",

@@ -180,6 +180,13 @@ class TrainProgress:
                             "status": "pending",
                             "have_output": True,
                             "path": "resources/data/merged.json"
+                        },
+                        {
+                            "name": "Data Filtering",
+                            "completed": False,
+                            "status": "pending",
+                            "have_output": True,
+                            "path": "resources/data/merged.json"
                         }
                     ]
                 },

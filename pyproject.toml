@@ -38,6 +38,7 @@ levenshtein = "0.27.1"
 
 # Development environment dependencies
 # Use 'poetry install --with dev' to install development dependencies
+ollama = "^0.5.1"
 [tool.poetry.group.dev.dependencies]
 pytest = "7.4.4"
 ruff = "0.1.15"

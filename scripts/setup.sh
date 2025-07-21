@@ -629,6 +629,40 @@ check_sqlite() {
     return 0
 }
 
+# Check and install Ollama if not present
+check_ollama() {
+    log_step "Checking Ollama installation"
+    
+    if ! command -v ollama &>/dev/null; then
+        log_warning "Ollama is not installed, attempting to install..."
+        
+        # Try to install Ollama using the official install script
+        log_info "Downloading and installing Ollama..."
+        if curl -fsSL https://ollama.ai/install.sh | sh; then
+            log_success "Ollama installed successfully"
+            
+            # Verify installation
+            if command -v ollama &>/dev/null; then
+                log_success "Ollama verification successful"
+                return 0
+            else
+                log_error "Ollama installed but not found in PATH"
+                log_error "Please restart your terminal or run: source ~/.bashrc"
+                return 1
+            fi
+        else
+            log_error "Failed to install Ollama automatically"
+            log_error "Please install Ollama manually: curl -fsSL https://ollama.ai/install.sh | sh"
+            return 1
+        fi
+    fi
+    
+    # Ollama is installed
+    local version=$(ollama --version 2>/dev/null || echo "unknown")
+    log_success "Ollama check passed, version $version"
+    return 0
+}
+
 # Parse command line arguments
 parse_args() {
     REQUIRE_CONFIRMATION=false

@@ -756,6 +756,49 @@ def save_hf_model(model_name=None, log_file_path=None) -> str:
         raise
     return save_path
 
+def save_ollama_model(model_name=None, log_file_path=None) -> str:
+    """Pull an Ollama model locally (e.g., gemini, llama3, etc.).
+    Args:
+        model_name: Name of the Ollama model to pull (e.g., 'gemini:2b').
+        log_file_path: Path to save download logs. If None, uses default path.
+    Returns:
+        The model name (as Ollama stores models internally).
+    """
+    import subprocess
+    import time
+    from lpm_kernel.configs.logging import TRAIN_LOG_FILE
+
+    if not model_name:
+        raise ValueError("Ollama model_name must be specified, e.g. 'gemini:2b'")
+    if not log_file_path:
+        log_file_path = TRAIN_LOG_FILE
+
+    logger = setup_logger(log_file_path, logger_name=f"ollama_download_{model_name}")
+    logger.info(f"Starting Ollama model pull: {model_name}")
+
+    try:
+        # Start the ollama pull process
+        with open(log_file_path, "a") as logf:
+            process = subprocess.Popen([
+                "ollama", "pull", model_name
+            ], stdout=logf, stderr=logf)
+            while True:
+                ret = process.poll()
+                if ret is not None:
+                    break
+                time.sleep(1)
+        if process.returncode == 0:
+            logger.info(f"Ollama model '{model_name}' pulled successfully.")
+        else:
+            logger.error(f"Ollama pull failed for model '{model_name}' with return code {process.returncode}.")
+            raise RuntimeError(f"Ollama pull failed for model '{model_name}'")
+    except Exception as e:
+        logger.error(f"Exception during Ollama pull: {str(e)}")
+        raise
+
+    # Ollama stores models internally, so just return the model name
+    return model_name
+
 def format_timestr(utc_time_str):
     """Formats a UTC time string to a more readable format.
     

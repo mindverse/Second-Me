@@ -644,6 +644,60 @@ class TrainProcessService:
         except Exception as e:
             logger.error(f"Data conversion failed: {str(e)}")
 
+    def data_filtering(self) -> bool:
+        """Filter and assess quality of training data using Ollama Gemma"""
+        try:
+            # Mark step as in progress
+            self.progress.mark_step_status(ProcessStep.DATA_FILTERING, Status.IN_PROGRESS)
+            logger.info("Starting data filtering with Ollama Gemma...")
+
+            # Import the MergedDataJudge
+            from lpm_kernel.L2.merged_data_judge import MergedDataJudge
+            
+            # Get user biography for context
+            from lpm_kernel.base.database_operate import get_latest_global_bio
+            user_bio = get_latest_global_bio().content_third_view if get_latest_global_bio() else ""
+            
+            # Initialize the judge with Ollama Gemma
+            judge = MergedDataJudge(
+                model_name="gemma:2b",
+                ollama_host="http://localhost:11434",
+                user_bio=user_bio
+            )
+            
+            # Define input and output paths
+            merged_json_path = "resources/data/merged.json"
+            filtered_output_path = "resources/data/filtered_merged.json"
+            
+            # Check if merged.json exists
+            if not os.path.exists(merged_json_path):
+                logger.error(f"Merged data file not found: {merged_json_path}")
+                self.progress.mark_step_status(ProcessStep.DATA_FILTERING, Status.FAILED)
+                return False
+            
+            # Perform data filtering
+            logger.info("Starting data quality assessment and filtering...")
+            judge.filter_and_score_data_concurrent(
+                merged_json_path=merged_json_path,
+                output_path=filtered_output_path,
+                user_bio=user_bio,
+                keep_ratio=0.8,  # Keep top 80%
+                max_workers=5
+            )
+            
+            # Replace the original merged.json with filtered data
+            import shutil
+            shutil.move(filtered_output_path, merged_json_path)
+            logger.info(f"Data filtering completed. Filtered data saved to {merged_json_path}")
+            
+            self.progress.mark_step_status(ProcessStep.DATA_FILTERING, Status.COMPLETED)
+            return True
+
+        except Exception as e:
+            logger.error(f"Data filtering failed: {str(e)}")
+            self.progress.mark_step_status(ProcessStep.DATA_FILTERING, Status.FAILED)
+            return False
+
     def train(self) -> bool:
         """Start model training"""
         try:
