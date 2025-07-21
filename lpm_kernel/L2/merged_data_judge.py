@@ -262,6 +262,15 @@ class MergedDataJudge:
         
         print(f"Filtered data saved to {output_path}")
 
+    def cleanup(self):
+        """Release the Ollama model from memory"""
+        try:
+            from lpm_kernel.L2.utils import release_ollama_models_early
+            release_ollama_models_early()
+            print(f"✅ Released Ollama models from memory")
+        except Exception as e:
+            print(f"⚠️ Could not release models: {str(e)}")
+
 def main():
     """
     Test function for MergedDataJudge

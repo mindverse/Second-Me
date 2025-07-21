@@ -690,6 +690,14 @@ class TrainProcessService:
             shutil.move(filtered_output_path, merged_json_path)
             logger.info(f"Data filtering completed. Filtered data saved to {merged_json_path}")
             
+            # Release Ollama models from memory to free up VRAM for training
+            logger.info("Releasing Ollama models from memory...")
+            try:
+                judge.cleanup()
+                logger.info("✅ Successfully released Ollama models from memory")
+            except Exception as e:
+                logger.warning(f"⚠️ Could not release Ollama models: {str(e)}")
+            
             self.progress.mark_step_status(ProcessStep.DATA_FILTERING, Status.COMPLETED)
             return True
 
