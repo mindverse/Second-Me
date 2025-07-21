@@ -178,9 +178,14 @@ class MergedDataJudge:
             keep_ratio: Ratio of data to keep (0.0-1.0), default 0.8 (80%)
             max_workers: Number of concurrent worker threads
         """
-        # Load data
-        with open(merged_json_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
+        try:
+            # Load data
+            with open(merged_json_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+        except Exception as e:
+            print(f"❌ Error loading {merged_json_path}: {str(e)}")
+            print("Keeping original file unchanged and skipping data filtering")
+            return
         
         total_items = len(data)
         keep_count = int(total_items * keep_ratio)
@@ -191,42 +196,43 @@ class MergedDataJudge:
         print(f"Using Ollama model: {self.model_name}")
         
         # Concurrent evaluation
-        scored_data = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            # Submit all evaluation tasks
-            future_to_index = {
-                executor.submit(self.evaluate_single_item, item, user_bio): i 
-                for i, item in enumerate(data)
-            }
-            
-            # Process results as they complete
-            completed_count = 0
-            for future in tqdm(concurrent.futures.as_completed(future_to_index), 
-                              total=len(data), desc="Evaluation Progress"):
-                index = future_to_index[future]
-                item = data[index]
+        try:
+            scored_data = []
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+                # Submit all evaluation tasks
+                future_to_index = {
+                    executor.submit(self.evaluate_single_item, item, user_bio): i 
+                    for i, item in enumerate(data)
+                }
                 
-                try:
-                    result = future.result()
+                # Process results as they complete
+                completed_count = 0
+                for future in tqdm(concurrent.futures.as_completed(future_to_index), 
+                                  total=len(data), desc="Evaluation Progress"):
+                    index = future_to_index[future]
+                    item = data[index]
                     
-                    # Add scoring fields to the original item
-                    item['score'] = result.score
-                    item['reasoning'] = result.reasoning
-                    item['quality_level'] = result.quality_level
-                    item['suggestions'] = result.suggestions
+                    try:
+                        result = future.result()
+                        
+                        # Add scoring fields to the original item
+                        item['score'] = result.score
+                        item['reasoning'] = result.reasoning
+                        item['quality_level'] = result.quality_level
+                        item['suggestions'] = result.suggestions
+                        
+                        scored_data.append(item)
+                        
+                    except Exception as e:
+                        print(f"❌ Error evaluating item {index}: {str(e)}")
+                        print("Keeping original file unchanged and skipping data filtering")
+                        return
                     
-                    scored_data.append(item)
-                    
-                except Exception as e:
-                    print(f"Error evaluating item {index}: {str(e)}")
-                    # Give default low score if evaluation fails
-                    item['score'] = 3.0
-                    item['reasoning'] = f"Evaluation failed: {str(e)}"
-                    item['quality_level'] = 'poor'
-                    item['suggestions'] = "Check data format and API configuration"
-                    scored_data.append(item)
-                
-                completed_count += 1
+                    completed_count += 1
+        except Exception as e:
+            print(f"❌ Error during concurrent evaluation: {str(e)}")
+            print("Keeping original file unchanged and skipping data filtering")
+            return
         
         # Sort by score (highest first)
         scored_data.sort(key=lambda x: x['score'], reverse=True)
@@ -257,10 +263,15 @@ class MergedDataJudge:
             print(f"  Quality distribution of kept items: {quality_counts}")
         
         # Save the filtered data back to the original file
-        with open(output_path, 'w', encoding='utf-8') as f:
-            json.dump(filtered_data, f, ensure_ascii=False, indent=2)
-        
-        print(f"Filtered data saved to {output_path}")
+        try:
+            with open(output_path, 'w', encoding='utf-8') as f:
+                json.dump(filtered_data, f, ensure_ascii=False, indent=2)
+            
+            print(f"Filtered data saved to {output_path}")
+        except Exception as e:
+            print(f"❌ Error saving filtered data: {str(e)}")
+            print("Keeping original file unchanged and skipping data filtering")
+            return
 
     def cleanup(self):
         """Release the Ollama model from memory"""
