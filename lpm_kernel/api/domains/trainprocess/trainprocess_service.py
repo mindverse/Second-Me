@@ -658,6 +658,13 @@ class TrainProcessService:
             from lpm_kernel.base.database_operate import get_latest_global_bio
             user_bio = get_latest_global_bio().content_third_view if get_latest_global_bio() else ""
             
+            # Log filtering parameters
+            logger.info(f"Data filtering parameters:")
+            logger.info(f"  - User bio length: {len(user_bio)} characters")
+            logger.info(f"  - User bio preview: {user_bio[:200]}{'...' if len(user_bio) > 200 else ''}")
+            logger.info(f"  - Keep ratio: 80% (0.8)")
+            logger.info(f"  - Max workers: 5")
+            
             # Initialize the judge with Ollama Gemma
             judge = MergedDataJudge(
                 model_name="gemma:2b",
@@ -667,7 +674,7 @@ class TrainProcessService:
             
             # Define input and output paths
             merged_json_path = "resources/data/merged.json"
-            filtered_output_path = "resources/data/filtered_merged.json"
+            # filtered_output_path = "resources/data/filtered_merged.json"
             
             # Check if merged.json exists
             if not os.path.exists(merged_json_path):
@@ -679,7 +686,7 @@ class TrainProcessService:
             logger.info("Starting data quality assessment and filtering...")
             judge.filter_and_score_data_concurrent(
                 merged_json_path=merged_json_path,
-                output_path=filtered_output_path,
+                output_path=merged_json_path,
                 user_bio=user_bio,
                 keep_ratio=0.8,  # Keep top 80%
                 max_workers=5
