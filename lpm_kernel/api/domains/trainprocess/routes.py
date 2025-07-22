@@ -71,10 +71,15 @@ def start_process():
         use_cuda = data.get("use_cuda", False)
         is_cot = data.get("is_cot", None)
         language = data.get("language", "en")
+        
+        # Data filtering parameters
+        data_filtering_model = data.get("data_filtering_model", "gemma:2b")
+        data_filtering_workers = data.get("data_filtering_workers", 5)
+        data_filtering_keep_ratio = data.get("data_filtering_keep_ratio", 0.8)
 
         # Log the received parameters
         logger.info(
-            f"Training parameters: model_name={model_name}, learning_rate={learning_rate}, number_of_epochs={number_of_epochs}, concurrency_threads={concurrency_threads}, data_synthesis_mode={data_synthesis_mode}, is_cot={is_cot}, language={language}")
+            f"Training parameters: model_name={model_name}, learning_rate={learning_rate}, number_of_epochs={number_of_epochs}, concurrency_threads={concurrency_threads}, data_synthesis_mode={data_synthesis_mode}, is_cot={is_cot}, language={language}, data_filtering_model={data_filtering_model}, data_filtering_workers={data_filtering_workers}, data_filtering_keep_ratio={data_filtering_keep_ratio}")
 
         # Create service instance with model name and additional parameters
         last_train_service = TrainProcessService.get_instance()
@@ -86,7 +91,12 @@ def start_process():
                 code=409  # Conflict status code
             ))
 
-        train_service = TrainProcessService(current_model_name=model_name)
+        train_service = TrainProcessService(
+            current_model_name=model_name,
+            data_filtering_model=data_filtering_model,
+            data_filtering_workers=data_filtering_workers,
+            data_filtering_keep_ratio=data_filtering_keep_ratio
+        )
         if not train_service.check_training_condition():
             train_service.reset_progress()
 
@@ -98,6 +108,9 @@ def start_process():
             "concurrency_threads": concurrency_threads,
             "data_synthesis_mode": data_synthesis_mode,
             "use_cuda": use_cuda,  # Make sure to include use_cuda parameter
+            "data_filtering_model": data_filtering_model,
+            "data_filtering_workers": data_filtering_workers,
+            "data_filtering_keep_ratio": data_filtering_keep_ratio,
             "is_cot": is_cot,
             "language": language  # Add language parameter
         }

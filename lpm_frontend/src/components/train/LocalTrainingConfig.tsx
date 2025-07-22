@@ -548,6 +548,126 @@ const LocalTrainingConfig: React.FC<LocalTrainingConfigProps> = ({
             </Tooltip>
           </div>
         </div>
+
+        {/* Step 5: Configure Data Filtering */}
+        <div className="flex flex-col gap-3">
+          <div className="text-base font-semibold text-gray-800 flex items-center">
+            Step 5: Configure Data Filtering
+          </div>
+
+          <div className="flex flex-col gap-4">
+            {/* Model Selection */}
+            <div className="flex flex-col gap-2">
+              <div className="text-sm font-medium text-gray-700">Filtering Model</div>
+              <Listbox
+                value={trainingParams.data_filtering_model || 'gemma:2b'}
+                onChange={(value) => updateTrainingParams({ data_filtering_model: value })}
+                disabled={disabledChangeParams}
+              >
+                <div className="relative">
+                  <Listbox.Button
+                    className={classNames(
+                      'relative w-full cursor-pointer rounded-md bg-white py-2 pl-3 pr-10 text-left border focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
+                      disabledChangeParams
+                        ? 'opacity-50 cursor-not-allowed border-gray-200'
+                        : 'border-gray-300 hover:border-gray-400'
+                    )}
+                  >
+                    <span className="block truncate">
+                      {trainingParams.data_filtering_model || 'gemma:2b'}
+                    </span>
+                    <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                      <ColumnArrowIcon className="h-5 w-5 text-gray-400" />
+                    </span>
+                  </Listbox.Button>
+                  <Transition
+                    as={Fragment}
+                    leave="transition ease-in duration-100"
+                    leaveFrom="opacity-100"
+                    leaveTo="opacity-0"
+                  >
+                    <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                      {[
+                        { value: 'gemma:2b', label: 'Gemma 2B' },
+                        { value: 'gemma2:9b', label: 'Gemma2 9B' },
+                        { value: 'gemma3:4b', label: 'Gemma3 4B' },
+                        { value: 'gemma3:12b', label: 'Gemma3 12B' },
+                        { value: 'gemma:7b', label: 'Gemma 7B' }
+                      ].map((model) => (
+                        <Listbox.Option
+                          key={model.value}
+                          className={({ active }) =>
+                            `relative cursor-pointer select-none py-2 pl-10 pr-4 ${
+                              active ? 'bg-blue-100 text-blue-900' : 'text-gray-900'
+                            }`
+                          }
+                          value={model.value}
+                        >
+                          {({ selected }) => (
+                            <>
+                              <span
+                                className={`block truncate ${
+                                  selected ? 'font-medium' : 'font-normal'
+                                }`}
+                              >
+                                {model.label}
+                              </span>
+                              {selected ? (
+                                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-blue-600">
+                                  <DoneIcon className="h-5 w-5" />
+                                </span>
+                              ) : null}
+                            </>
+                          )}
+                        </Listbox.Option>
+                      ))}
+                    </Listbox.Options>
+                  </Transition>
+                </div>
+              </Listbox>
+              <div className="text-xs text-gray-500">
+                Choose the Ollama model for intelligent data filtering and quality assessment
+              </div>
+            </div>
+
+            {/* Workers Configuration */}
+            <div className="flex flex-col gap-2">
+              <div className="text-sm font-medium text-gray-700">Number of Workers</div>
+              <InputNumber
+                min={1}
+                max={10}
+                value={trainingParams.data_filtering_workers || 5}
+                onChange={(value) => updateTrainingParams({ data_filtering_workers: value || 5 })}
+                disabled={disabledChangeParams}
+                className="w-full"
+                placeholder="5"
+              />
+              <div className="text-xs text-gray-500">
+                Number of concurrent workers for data filtering (1-10, default: 5)
+              </div>
+            </div>
+
+            {/* Keep Ratio Configuration */}
+            <div className="flex flex-col gap-2">
+              <div className="text-sm font-medium text-gray-700">Keep Ratio</div>
+              <InputNumber
+                min={0.1}
+                max={1.0}
+                step={0.1}
+                value={trainingParams.data_filtering_keep_ratio || 0.8}
+                onChange={(value) => updateTrainingParams({ data_filtering_keep_ratio: value || 0.8 })}
+                disabled={disabledChangeParams}
+                className="w-full"
+                placeholder="0.8"
+                formatter={(value) => `${(Number(value) * 100).toFixed(0)}%`}
+                parser={(value) => Number(value!.replace('%', '')) / 100}
+              />
+              <div className="text-xs text-gray-500">
+                Percentage of data to keep after filtering (10%-100%, default: 80%)
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <ThinkingModelModal onClose={() => setOpenThinkingModel(false)} open={openThinkingModel} />

@@ -85,6 +85,9 @@ export interface LocalTrainingParams {
   use_cuda?: boolean;
   is_cot?: boolean;
   language?: string;
+  data_filtering_model?: string;
+  data_filtering_workers?: number;
+  data_filtering_keep_ratio?: number;
 }
 
 // Cloud training configuration
@@ -98,6 +101,9 @@ export interface CloudTrainingParams {
   base_model: string;
   training_type?: string;
   hyper_parameters?: CloudHyperParameters;
+  data_filtering_model?: string;
+  data_filtering_workers?: number;
+  data_filtering_keep_ratio?: number;
   data_synthesis_mode?: string;
   created_at?: string;
   language?: string;

@@ -59,7 +59,8 @@ class TrainProcessService:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self, current_model_name: str):
+    def __init__(self, current_model_name: str, data_filtering_model: str = 'gemma:2b', 
+                 data_filtering_workers: int = 5, data_filtering_keep_ratio: float = 0.8):
         if current_model_name is None:
             raise ValueError("current_model_name cannot be None")
 
@@ -77,6 +78,11 @@ class TrainProcessService:
             training_params = params_manager.get_latest_training_params()
             self.language = training_params["language"]
 
+            # Store data filtering parameters
+            self.data_filtering_model = data_filtering_model
+            self.data_filtering_workers = data_filtering_workers
+            self.data_filtering_keep_ratio = data_filtering_keep_ratio
+
         # Update model name and progress instance if model name changes
         if current_model_name != self.model_name:
             self.model_name = current_model_name
@@ -84,11 +90,15 @@ class TrainProcessService:
             self.progress = TrainProgressHolder(current_model_name)
 
     @classmethod
-    def get_instance(cls, current_model_name: str = None):
+    def get_instance(cls, current_model_name: str = None, data_filtering_model: str = 'gemma:2b',
+                    data_filtering_workers: int = 5, data_filtering_keep_ratio: float = 0.8):
         """Get the current instance of TrainProcessService
         
         Args:
             current_model_name: Optional model name to update the instance with
+            data_filtering_model: Model to use for data filtering
+            data_filtering_workers: Number of workers for data filtering
+            data_filtering_keep_ratio: Ratio of data to keep after filtering
             
         Returns:
             TrainProcessService: The singleton instance
@@ -97,12 +107,16 @@ class TrainProcessService:
             if current_model_name is None:
                 logger.warning("current_model_name must be provided when creating a new instance")
                 return None
-            return cls(current_model_name)
+            return cls(current_model_name, data_filtering_model, data_filtering_workers, data_filtering_keep_ratio)
 
         if current_model_name is not None:
             # Update the existing instance with new model name
             cls._instance.model_name = current_model_name
             cls._instance.progress = TrainProgressHolder(current_model_name)
+            # Update data filtering parameters
+            cls._instance.data_filtering_model = data_filtering_model
+            cls._instance.data_filtering_workers = data_filtering_workers
+            cls._instance.data_filtering_keep_ratio = data_filtering_keep_ratio
 
         return cls._instance
 
@@ -658,16 +672,22 @@ class TrainProcessService:
             from lpm_kernel.base.database_operate import get_latest_global_bio
             user_bio = get_latest_global_bio().content_third_view if get_latest_global_bio() else ""
             
+            # Get filtering parameters from training configuration
+            filtering_model = getattr(self, 'data_filtering_model', 'gemma:2b')
+            max_workers = getattr(self, 'data_filtering_workers', 5)
+            keep_ratio = getattr(self, 'data_filtering_keep_ratio', 0.8)
+            
             # Log filtering parameters
             logger.info(f"Data filtering parameters:")
             logger.info(f"  - User bio length: {len(user_bio)} characters")
             logger.info(f"  - User bio preview: {user_bio[:200]}{'...' if len(user_bio) > 200 else ''}")
-            logger.info(f"  - Keep ratio: 80% (0.8)")
-            logger.info(f"  - Max workers: 5")
+            logger.info(f"  - Filtering model: {filtering_model}")
+            logger.info(f"  - Keep ratio: {keep_ratio * 100:.0f}% ({keep_ratio})")
+            logger.info(f"  - Max workers: {max_workers}")
             
-            # Initialize the judge with Ollama Gemma
+            # Initialize the judge with selected model
             judge = MergedDataJudge(
-                model_name="gemma:2b",
+                model_name=filtering_model,
                 ollama_host="http://localhost:11434",
                 user_bio=user_bio
             )
@@ -688,8 +708,8 @@ class TrainProcessService:
                 merged_json_path=merged_json_path,
                 output_path=merged_json_path,
                 user_bio=user_bio,
-                keep_ratio=0.8,  # Keep top 80%
-                max_workers=5
+                keep_ratio=keep_ratio,
+                max_workers=max_workers
             )
             
             # Replace the original merged.json with filtered data
