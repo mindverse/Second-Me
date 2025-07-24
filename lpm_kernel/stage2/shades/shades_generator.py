@@ -141,6 +141,28 @@ class ShadeGenerate():
         if response.strip().endswith('```'):
             response = response.strip()[:-3]  # 移除结尾的```
 
+        # Fix unquoted shadeIcon values
+        import re
+        # Pattern to match "shadeIcon": followed by an unquoted emoji or text
+        # This handles cases like "shadeIcon": 🏙️, or "shadeIcon": ❤️
+        pattern = r'"shadeIcon":\s*([^",\s][^,}\]]*?)(?=,|\s*[}\]])'
+        
+        def replace_icon(match):
+            icon_value = match.group(1).strip()
+            # If the icon is not already quoted, quote it
+            if not (icon_value.startswith('"') and icon_value.endswith('"')):
+                return f'"shadeIcon": "{icon_value}"'
+            return match.group(0)
+        
+        response = re.sub(pattern, replace_icon, response)
+
+        # Additional JSON cleaning - fix common issues
+        # Fix trailing commas before closing brackets/braces
+        response = re.sub(r',(\s*[}\]])', r'\1', response)
+        
+        # Note: Removed the general unquoted string fix as it was causing issues with array elements
+        # The shadeIcon-specific fix should be sufficient for this use case
+
         return response.strip()
 
     # @observe(name="shades_generate")
@@ -384,6 +406,28 @@ class ShadeContentGenerate():
         # 移除结尾的```
         if response.strip().endswith('```'):
             response = response.strip()[:-3]  # 移除结尾的```
+
+        # Fix unquoted shadeIcon values
+        import re
+        # Pattern to match "shadeIcon": followed by an unquoted emoji or text
+        # This handles cases like "shadeIcon": 🏙️, or "shadeIcon": ❤️
+        pattern = r'"shadeIcon":\s*([^",\s][^,}\]]*?)(?=,|\s*[}\]])'
+        
+        def replace_icon(match):
+            icon_value = match.group(1).strip()
+            # If the icon is not already quoted, quote it
+            if not (icon_value.startswith('"') and icon_value.endswith('"')):
+                return f'"shadeIcon": "{icon_value}"'
+            return match.group(0)
+        
+        response = re.sub(pattern, replace_icon, response)
+
+        # Additional JSON cleaning - fix common issues
+        # Fix trailing commas before closing brackets/braces
+        response = re.sub(r',(\s*[}\]])', r'\1', response)
+        
+        # Note: Removed the general unquoted string fix as it was causing issues with array elements
+        # The shadeIcon-specific fix should be sufficient for this use case
 
         return response.strip()
 
