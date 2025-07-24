@@ -217,9 +217,9 @@ class MergedDataJudge:
                         
                         # Add scoring fields to the original item
                         item['score'] = result.score
-                        item['reasoning'] = result.reasoning
-                        item['quality_level'] = result.quality_level
-                        item['suggestions'] = result.suggestions
+                        # item['reasoning'] = result.reasoning
+                        # item['quality_level'] = result.quality_level
+                        # item['suggestions'] = result.suggestions
                         
                         scored_data.append(item)
                         
@@ -255,12 +255,12 @@ class MergedDataJudge:
             print(f"  Original average score: {avg_score:.2f}")
             print(f"  Kept average score: {kept_avg_score:.2f}")
             
-            # Log quality distribution
-            quality_counts = {}
-            for item in filtered_data:
-                quality = item['quality_level']
-                quality_counts[quality] = quality_counts.get(quality, 0) + 1
-            print(f"  Quality distribution of kept items: {quality_counts}")
+            # Log quality distribution (commented out since quality_level is not added to output)
+            # quality_counts = {}
+            # for item in filtered_data:
+            #     quality = item['quality_level']
+            #     quality_counts[quality] = quality_counts.get(quality, 0) + 1
+            # print(f"  Quality distribution of kept items: {quality_counts}")
         
         # Save the filtered data back to the original file
         try:

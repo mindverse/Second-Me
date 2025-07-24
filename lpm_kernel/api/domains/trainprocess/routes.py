@@ -91,12 +91,7 @@ def start_process():
                 code=409  # Conflict status code
             ))
 
-        train_service = TrainProcessService(
-            current_model_name=model_name,
-            data_filtering_model=data_filtering_model,
-            data_filtering_workers=data_filtering_workers,
-            data_filtering_keep_ratio=data_filtering_keep_ratio
-        )
+        train_service = TrainProcessService(current_model_name=model_name)
         if not train_service.check_training_condition():
             train_service.reset_progress()
 

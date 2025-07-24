@@ -47,7 +47,7 @@ const defaultCloudTrainingParams: CloudTrainingParams = {
     n_epochs: 3
   },
   language: 'english',
-  is_cot: true
+  is_cot: true // 添加 is_cot 默认值
 };
 
 const CloudTrainingConfig: React.FC<CloudTrainingConfigProps> = ({
@@ -87,7 +87,7 @@ const CloudTrainingConfig: React.FC<CloudTrainingConfigProps> = ({
         ...(trainingParams.hyper_parameters || {})
       },
       language: trainingParams.language || defaultCloudTrainingParams.language,
-      is_cot: true
+      is_cot: true // 确保 is_cot 始终为 true
     };
 
     // 只有在值不同时才更新

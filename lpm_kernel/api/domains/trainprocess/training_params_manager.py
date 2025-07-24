@@ -25,7 +25,10 @@ class TrainingParamsManager:
         "data_synthesis_mode": "high",
         "use_cuda": False,  # Default to using CUDA when available
         "is_cot": True,
-        "language": "chinese"
+        "language": "chinese",
+        "data_filtering_model": "gemma:2b",
+        "data_filtering_workers": 5,
+        "data_filtering_keep_ratio": 0.8
     }
 
     _params_file_path = None
