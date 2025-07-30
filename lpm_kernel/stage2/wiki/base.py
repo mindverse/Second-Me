@@ -23,18 +23,26 @@ from .utils import Note, Entity, Timeline, EntityWiki, Conversation, TimelineTyp
 
 load_dotenv(override=True)
 
-user_llm_config_service = UserLLMConfigService()
-user_llm_config = user_llm_config_service.get_available_llm()
-if user_llm_config is None:
-    client = None
-    MODEL_NAME = None
-else:
-    client = OpenAI(
-        api_key=user_llm_config.chat_api_key,
-        base_url=user_llm_config.chat_endpoint,
-        timeout=45.0,  # Set global timeout
-    )
-    MODEL_NAME = user_llm_config.chat_model_name
+# Initialize these variables as None, will be set when needed
+client = None
+MODEL_NAME = None
+
+def get_llm_client():
+    """Get LLM client, initializing it if needed"""
+    global client, MODEL_NAME
+    if client is None:
+        user_llm_config_service = UserLLMConfigService()
+        user_llm_config = user_llm_config_service.get_available_llm()
+        if user_llm_config is None:
+            return None, None
+        else:
+            client = OpenAI(
+                api_key=user_llm_config.chat_api_key,
+                base_url=user_llm_config.chat_endpoint,
+                timeout=45.0,  # Set global timeout
+            )
+            MODEL_NAME = user_llm_config.chat_model_name
+    return client, MODEL_NAME
 
 from .utils import (build_clusters,
                     find_neibor_entities,
@@ -70,7 +78,7 @@ PERSONAL_WIKI_DEFAULT_PROMPT = {
 
 class EntityScorer:
     def __init__(self, langfuse_dict: Dict[str, Any]):
-        self.llm = client
+        self.llm, _ = get_llm_client()
         self.langfuse_dict = langfuse_dict
 
     def score_entities(self, entities: List[Entity], notes: List[Note], conversations: List[Conversation],
@@ -112,8 +120,9 @@ class EntityScorer:
             global_bio=global_bio,  # 全局生物信息
             system_prompt=self.langfuse_dict['extract_filter']['system_prompt']  # 系统提示
         )
+        _, model_name = get_llm_client()
         answer = self.llm.chat.completions.create(
-            model=MODEL_NAME,
+            model=model_name,
             messages=message,
         )
         # 获取对话生成的内容
@@ -141,8 +150,9 @@ class EntityScorer:
         )
         # 与LLM模型进行对话生成
         # answer = self.llm.chat_generate(message)
+        _, model_name = get_llm_client()
         answer = self.llm.chat.completions.create(
-            model=MODEL_NAME,
+            model=model_name,
             messages=message,
         )
         # 获取对话生成的内容
@@ -242,10 +252,11 @@ class EntityExtractor:
             k: self._get_langfuse_prompt(k, v) for k, v in ENTITY_EXTRACTOR_DEFAULT_PROMPT.items()
         }
         # 将self.llms设置为一个字典，其中包含不同的OpenAI客户端
+        llm_client, _ = get_llm_client()
         self.llms = {
-            "entity_extractor": client,
-            "duplicate_entities": client,
-            "merge_entities": client
+            "entity_extractor": llm_client,
+            "duplicate_entities": llm_client,
+            "merge_entities": llm_client
         }
 
         # self.redis_message = MessageRedis()
@@ -423,7 +434,8 @@ class EntityExtractor:
                                                            'system_prompt'])
         try:
 
-            answer = self.llms["entity_extractor"].chat.completions.create(messages=message, model=MODEL_NAME,
+            _, model_name = get_llm_client()
+            answer = self.llms["entity_extractor"].chat.completions.create(messages=message, model=model_name,
                                                                            **self.model_params)
             content = answer.choices[0].message.content
             return self.extract_entity_postprocess_new(content)
@@ -582,7 +594,8 @@ class EntityExtractor:
                                                          system_prompt=self.langfuse_dict['generate_timeline_by_note'][
                                                              'system_prompt'])
             # 使用实体提取器生成回答
-            answer = self.llms["entity_extractor"].chat.completions.create(messages=message, model=MODEL_NAME,
+            _, model_name = get_llm_client()
+            answer = self.llms["entity_extractor"].chat.completions.create(messages=message, model=model_name,
                                                                            **self.model_params)
             content = answer.choices[0].message.content
 
@@ -682,7 +695,8 @@ class EntityExtractor:
                                                              "system_prompt"])
 
         # 与LLM进行对话，生成处理重复实体的回答
-        answer = self.llms["duplicate_entities"].chat.completions.create(messages=message, model=MODEL_NAME,**self.model_params)
+        _, model_name = get_llm_client()
+        answer = self.llms["duplicate_entities"].chat.completions.create(messages=message, model=model_name,**self.model_params)
 
         # 从回答中提取内容
         content = answer.choices[0].message.content
@@ -877,7 +891,8 @@ class EntityExtractor:
                                                       system_prompt=self.langfuse_dict["merge_entities"][
                                                           "system_prompt"])
 
-        answer = self.llms["merge_entities"].chat.completions.create(messages=messages, model=MODEL_NAME,
+        _, model_name = get_llm_client()
+        answer = self.llms["merge_entities"].chat.completions.create(messages=messages, model=model_name,
                                                                      **self.model_params)
         content = answer.choices[0].message.content
 
@@ -953,7 +968,8 @@ class PersonalWiki:
     }
 
     def __init__(self, **kwargs):
-        self.model_name = MODEL_NAME
+        _, model_name = get_llm_client()
+        self.model_name = model_name
         # self.model_name = "anthropic/claude-3-5-sonnet-20241022"
         self.max_threads = 5
         self.class_name = self.__class__.__name__
@@ -962,17 +978,18 @@ class PersonalWiki:
         self.langfuse_dict = {
             k: self._get_langfuse_prompt(k, v) for k, v in PERSONAL_WIKI_DEFAULT_PROMPT.items()
         }
-        self.llms = client
+        llm_client, _ = get_llm_client()
+        self.llms = llm_client
 
     def _get_langfuse_prompt(self, prompt_key, default_prompt) -> Dict[str, Any]:
         try:
             system_prompt = default_prompt
-            model = MODEL_NAME
+            _, model = get_llm_client()
             logger.info(f"Get prompt success: {prompt_key}")
         except Exception as e:
             logger.error(f"Failed to get prompt [{prompt_key}]: {traceback.format_exc()}")
             system_prompt = default_prompt
-            model = MODEL_NAME
+            _, model = get_llm_client()
         return {"system_prompt": system_prompt, "model": model}
 
     def _call(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
