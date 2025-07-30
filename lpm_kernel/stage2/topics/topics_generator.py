@@ -230,7 +230,6 @@ class TopicGenerate():
             answer = llm.chat.completions.create(
                 model=self.model_name,
                 messages=message,
-                # extra_body={"metadata": {"tags": "lpm_topics_generate"}},
             )
             result = answer.choices[0].message.content
 

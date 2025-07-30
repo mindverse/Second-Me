@@ -351,7 +351,6 @@ class DPOData:
                 model=model,
                 messages=messages,
                 response_format=format_class,
-                # extra_body={"metadata": {"tags": ["lpmPreferDataGen"]}},
             )
             message = completion.choices[0].message
             if message.parsed:

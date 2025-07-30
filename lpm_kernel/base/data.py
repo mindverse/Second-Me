@@ -50,7 +50,6 @@ class BaseData(ABC):
                     response = self.reasoning_client.chat.completions.create(
                         model=self.reasoning_model_name,
                         messages=messages,
-                        # extra_body={"metadata": {"tags": "lpm-pipeline-using"}},
                     )
                     result = response.choices[0].message
                     logger.info("===============================================")
@@ -66,7 +65,6 @@ class BaseData(ABC):
                         messages=messages,
                         temperature=0,
                         max_tokens=3000,
-                        # extra_body={"metadata": {"tags": "lpm-pipeline-using"}},
                     ).choices[0].message.content
                     return responses
             except Exception as e:
