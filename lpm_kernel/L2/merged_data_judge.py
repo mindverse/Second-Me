@@ -217,7 +217,7 @@ class MergedDataJudge:
                         
                         # Add scoring fields to the original item
                         item['score'] = result.score
-                        # item['reasoning'] = result.reasoning
+                        item['reasoning'] = result.reasoning
                         # item['quality_level'] = result.quality_level
                         # item['suggestions'] = result.suggestions
                         
