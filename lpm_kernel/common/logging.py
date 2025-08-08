@@ -3,6 +3,9 @@ import logging
 import logging.config
 import os
 import sys
+import re
+from datetime import datetime
+from typing import Optional
 from lpm_kernel.configs.logging import LOGGING_CONFIG, LOG_BASE_DIR, TRAIN_LOG_DIR, rename_existing_log_file
 
 
@@ -56,3 +59,18 @@ def setup_logging():
 
 # Initialize global logger
 logger = setup_logging()
+
+
+def clean_ansi_sequences(text: str) -> str:
+    """
+    Remove ANSI escape sequences from text.
+    
+    Args:
+        text: Text that may contain ANSI escape sequences
+        
+    Returns:
+        Text with ANSI escape sequences removed
+    """
+    # ANSI escape sequence regex pattern
+    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+    return ansi_escape.sub('', text)

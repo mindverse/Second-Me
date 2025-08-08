@@ -767,6 +767,7 @@ def save_ollama_model(model_name=None, log_file_path=None) -> str:
     import subprocess
     import time
     from lpm_kernel.configs.logging import TRAIN_LOG_FILE
+    from lpm_kernel.common.logging import clean_ansi_sequences
 
     if not model_name:
         raise ValueError("Ollama model_name must be specified, e.g. 'gemini:2b'")
@@ -781,12 +782,37 @@ def save_ollama_model(model_name=None, log_file_path=None) -> str:
         with open(log_file_path, "a") as logf:
             process = subprocess.Popen([
                 "ollama", "pull", model_name
-            ], stdout=logf, stderr=logf)
+            ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1, universal_newlines=True)
+            
+            # Read output in real-time and clean ANSI sequences
             while True:
                 ret = process.poll()
                 if ret is not None:
                     break
-                time.sleep(1)
+                
+                # Read available output
+                if process.stdout:
+                    line = process.stdout.readline()
+                    if line:
+                        # Clean ANSI sequences and write to log
+                        cleaned_line = clean_ansi_sequences(line)
+                        if cleaned_line.strip():  # Only write non-empty lines
+                            logf.write(cleaned_line)
+                            logf.flush()  # Ensure immediate write
+                
+                time.sleep(0.1)  # Small delay to prevent CPU spinning
+            
+            # Read any remaining output
+            remaining_output, remaining_error = process.communicate()
+            if remaining_output:
+                cleaned_output = clean_ansi_sequences(remaining_output)
+                if cleaned_output.strip():
+                    logf.write(cleaned_output)
+            if remaining_error:
+                cleaned_error = clean_ansi_sequences(remaining_error)
+                if cleaned_error.strip():
+                    logf.write(cleaned_error)
+                    
         if process.returncode == 0:
             logger.info(f"Ollama model '{model_name}' pulled successfully.")
         else:

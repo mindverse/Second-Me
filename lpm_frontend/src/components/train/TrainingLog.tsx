@@ -13,6 +13,26 @@ const TrainingLog: React.FC<TrainingLogProps> = ({ trainingDetails }: TrainingLo
   const userScrollTimeout = useRef<NodeJS.Timeout | null>(null);
   const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState(true);
 
+  // Function to clean ANSI escape sequences from text
+  const cleanAnsiSequences = (text: string): string => {
+    // More comprehensive ANSI escape sequence regex pattern
+    // This handles various ANSI escape sequences including:
+    // - Cursor movement: \x1b[nA, \x1b[nB, \x1b[nC, \x1b[nD
+    // - Clear screen: \x1b[K, \x1b[J
+    // - Color codes: \x1b[38;5;n, \x1b[48;5;n, \x1b[0m, etc.
+    // - Progress bar characters: █, ▓, ▒, ░, ▏, ▕
+    const ansiEscape = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g;
+    
+    // Remove ANSI escape sequences
+    let cleaned = text.replace(ansiEscape, '');
+    
+    // Also remove common progress bar characters that might cause display issues
+    const progressChars = /[█▓▒░▏▕]/g;
+    cleaned = cleaned.replace(progressChars, '=');
+    
+    return cleaned;
+  };
+
   // Smooth scroll console to bottom
   const smoothScrollConsole = () => {
     if (consoleEndRef.current && !isUserScrolling) {
@@ -108,7 +128,7 @@ const TrainingLog: React.FC<TrainingLogProps> = ({ trainingDetails }: TrainingLo
           {trainingDetails.length > 0 ? (
             trainingDetails.map((detail, index) => (
               <div key={detail.timestamp + detail.message + index} className="text-gray-300">
-                {detail.message}
+                {cleanAnsiSequences(detail.message)}
               </div>
             ))
           ) : (
