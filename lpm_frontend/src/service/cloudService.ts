@@ -105,6 +105,9 @@ export const startCloudTraining = (params: {
   training_type?: string;
   data_synthesis_mode?: string;
   language?: string;
+  data_filtering_model?: string;
+  data_filtering_workers?: number;
+  data_filtering_keep_ratio?: number;
   hyper_parameters?: Record<string, unknown>;
 }): AxiosPromise<CommonResponse<unknown>> => {
   return Request<CommonResponse<unknown>>({

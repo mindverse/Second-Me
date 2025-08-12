@@ -50,6 +50,9 @@ class CloudTrainProcessService(TrainProcessService):
         self.hyper_parameters = hyper_parameters
         self.model_name = current_model_name
         self.job_id = None
+        
+        # Load cloud training parameters for data filtering
+        self.cloud_training_params = self._load_cloud_training_params()
 
         # For tracking data processing process
         self._data_processing_process = None
@@ -64,6 +67,30 @@ class CloudTrainProcessService(TrainProcessService):
 
         # Initialize cloud service
         self.cloud_service = CloudService()
+
+    def _load_cloud_training_params(self):
+        """Load cloud training parameters from file"""
+        try:
+            params_file = Path("data/cloud_progress/cloud_training_params.json")
+            if params_file.exists():
+                with open(params_file, "r", encoding="utf-8") as f:
+                    params = json.load(f)
+                logger.info(f"Loaded cloud training parameters: {params}")
+                return params
+            else:
+                logger.warning("Cloud training parameters file not found, using default values")
+                return {
+                    "data_filtering_model": "gemma:2b",
+                    "data_filtering_workers": 5,
+                    "data_filtering_keep_ratio": 0.8
+                }
+        except Exception as e:
+            logger.error(f"Failed to load cloud training parameters: {str(e)}")
+            return {
+                "data_filtering_model": "gemma:2b",
+                "data_filtering_workers": 5,
+                "data_filtering_keep_ratio": 0.8
+            }
 
     @classmethod
     def get_instance(cls):
@@ -515,16 +542,37 @@ class CloudTrainProcessService(TrainProcessService):
                         return PrepareDataResult.ERROR
 
                 if stage:
-                    stage["progress"] = 100.0
-                    stage["status"] = CloudStatus.COMPLETED
+                    stage["progress"] = 75.0
                     if len(stage["steps"]) > 2:
                         stage["steps"][2]["completed"] = True
                         stage["steps"][2]["status"] = CloudStatus.COMPLETED
-                    logger.info(f"Updated {stage_name} progress to 100% after completing convert_data")
+                    logger.info(f"Updated {stage_name} progress to 75% after completing convert_data")
                     self._update_overall_progress()
 
                 if self.is_stopped:
                     logger.info("Process has been stopped after completing convert_data, exiting.")
+                    return PrepareDataResult.STOPPED
+
+                logger.info("Step 5.4: Data filtering...")
+                if self.progress.is_step_completed(stage_name, "data_filtering"):
+                    logger.info("Step 'data_filtering' already completed, skipping...")
+                else:
+                    if not super().data_filtering():
+                        logger.error("Failed to perform data filtering")
+                        self.progress.mark_step_status(ProcessStep.DATA_FILTERING, CloudStatus.FAILED)
+                        return PrepareDataResult.ERROR
+
+                if stage:
+                    stage["progress"] = 100.0
+                    stage["status"] = CloudStatus.COMPLETED
+                    if len(stage["steps"]) > 3:
+                        stage["steps"][3]["completed"] = True
+                        stage["steps"][3]["status"] = CloudStatus.COMPLETED
+                    logger.info(f"Updated {stage_name} progress to 100% after completing data_filtering")
+                    self._update_overall_progress()
+
+                if self.is_stopped:
+                    logger.info("Process has been stopped after completing data_filtering, exiting.")
                     return PrepareDataResult.STOPPED
 
             self._update_overall_progress()
@@ -545,6 +593,77 @@ class CloudTrainProcessService(TrainProcessService):
                         self.progress.mark_step_status(stage_name, CloudStatus.FAILED)
                         break
             return PrepareDataResult.ERROR
+
+    def data_filtering(self) -> bool:
+        """Override data filtering to use cloud training parameters"""
+        try:
+            # Mark step as in progress
+            self.progress.mark_step_status(ProcessStep.DATA_FILTERING, CloudStatus.IN_PROGRESS)
+            logger.info("Starting data filtering with cloud training parameters...")
+
+            # Import the MergedDataJudge
+            from lpm_kernel.L2.merged_data_judge import MergedDataJudge
+            
+            # Get user biography for context
+            from lpm_kernel.base.database_operate import get_latest_global_bio
+            user_bio = get_latest_global_bio().content_third_view if get_latest_global_bio() else ""
+            
+            # Get filtering parameters from cloud training parameters
+            filtering_model = self.cloud_training_params.get('data_filtering_model', 'gemma:2b')
+            max_workers = self.cloud_training_params.get('data_filtering_workers', 5)
+            keep_ratio = self.cloud_training_params.get('data_filtering_keep_ratio', 0.8)
+            
+            # Log filtering parameters
+            logger.info(f"Cloud data filtering parameters:")
+            logger.info(f"  - User bio length: {len(user_bio)} characters")
+            logger.info(f"  - User bio preview: {user_bio[:200]}{'...' if len(user_bio) > 200 else ''}")
+            logger.info(f"  - Filtering model: {filtering_model}")
+            logger.info(f"  - Keep ratio: {keep_ratio * 100:.0f}% ({keep_ratio})")
+            logger.info(f"  - Max workers: {max_workers}")
+            
+            # Initialize the judge with selected model
+            judge = MergedDataJudge(
+                model_name=filtering_model,
+                ollama_host="http://localhost:11434",
+                user_bio=user_bio
+            )
+            
+            # Define input and output paths
+            merged_json_path = "resources/data/merged.json"
+            
+            # Check if merged.json exists
+            if not os.path.exists(merged_json_path):
+                logger.error(f"Merged data file not found: {merged_json_path}")
+                self.progress.mark_step_status(ProcessStep.DATA_FILTERING, CloudStatus.FAILED)
+                return False
+            
+            # Perform data filtering
+            logger.info("Starting data quality assessment and filtering...")
+            judge.filter_and_score_data_concurrent(
+                merged_json_path=merged_json_path,
+                output_path=merged_json_path,
+                user_bio=user_bio,
+                keep_ratio=keep_ratio,
+                max_workers=max_workers
+            )
+            
+            logger.info(f"Data filtering completed. Filtered data saved to {merged_json_path}")
+            
+            # Release Ollama models from memory to free up VRAM for training
+            logger.info("Releasing Ollama models from memory...")
+            try:
+                judge.cleanup()
+                logger.info("✅ Successfully released Ollama models from memory")
+            except Exception as e:
+                logger.warning(f"⚠️ Could not release Ollama models: {str(e)}")
+            
+            self.progress.mark_step_status(ProcessStep.DATA_FILTERING, CloudStatus.COMPLETED)
+            return True
+
+        except Exception as e:
+            logger.error(f"Cloud data filtering failed: {str(e)}")
+            self.progress.mark_step_status(ProcessStep.DATA_FILTERING, CloudStatus.FAILED)
+            return False
 
     def start_process(self) -> bool:
         """Start the cloud training process using CloudService"""

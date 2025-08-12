@@ -1607,6 +1607,9 @@ export default function TrainingPage(): JSX.Element {
         data_synthesis_mode: cloudTrainingParams.data_synthesis_mode || 'medium',
         language: cloudTrainingParams.language || 'english',
         is_cot: true, // 确保 is_cot 设置为 true
+        data_filtering_model: cloudTrainingParams.data_filtering_model || 'gemma:2b',
+        data_filtering_workers: cloudTrainingParams.data_filtering_workers || 5,
+        data_filtering_keep_ratio: cloudTrainingParams.data_filtering_keep_ratio || 0.8,
         hyper_parameters: {
           n_epochs: cloudTrainingParams.hyper_parameters?.n_epochs,
           learning_rate: cloudTrainingParams.hyper_parameters?.learning_rate

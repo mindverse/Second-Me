@@ -184,6 +184,13 @@ class CloudProgress:
                             "status": CloudStatus.PENDING,
                             "have_output": True,
                             "path": "resources/data/merged.json"
+                        },
+                        {
+                            "name": "Data Filtering",
+                            "completed": False,
+                            "status": CloudStatus.PENDING,
+                            "have_output": True,
+                            "path": "resources/data/merged.json"
                         }
                     ]
                 },
@@ -261,6 +268,7 @@ class CloudProgress:
             ProcessStep.SYNTHETIC_DATA_GENERATION: "memory_expansion",
             ProcessStep.SYNTHETIC_NO_NOTES_DATA_GENERATION: "memory_expansion",
             ProcessStep.CONVERT_DATA: "memory_expansion",
+            ProcessStep.DATA_FILTERING: "memory_expansion",
 
             CloudProcessStep.UPLOAD_TRAINING_DATA: "training_to_create_second_me",
             CloudProcessStep.CREATE_FINE_TUNE_JOB: "training_to_create_second_me",

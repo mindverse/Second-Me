@@ -241,6 +241,11 @@ def start_cloud_training():
         hyper_parameters = data.get("hyper_parameters", {})
         data_synthesis_mode = data.get("data_synthesis_mode", "low")
         language = data.get("language", "en")
+        
+        # Data filtering parameters
+        data_filtering_model = data.get("data_filtering_model", "gemma:2b")
+        data_filtering_workers = data.get("data_filtering_workers", 5)
+        data_filtering_keep_ratio = data.get("data_filtering_keep_ratio", 0.8)
 
         os.environ["DATA_SYNTHESIS_MODE"] = data_synthesis_mode
         
@@ -251,6 +256,9 @@ def start_cloud_training():
             "hyper_parameters": hyper_parameters,
             "data_synthesis_mode": data_synthesis_mode,
             "language": language,
+            "data_filtering_model": data_filtering_model,
+            "data_filtering_workers": data_filtering_workers,
+            "data_filtering_keep_ratio": data_filtering_keep_ratio,
             "created_at": datetime.now().isoformat()
         }
         
