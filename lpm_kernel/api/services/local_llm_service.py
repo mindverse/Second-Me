@@ -112,10 +112,7 @@ class LocalLLMService:
                 server_path,
                 "-m", model_path,
                 "--host", "0.0.0.0",
-                "--port", "8080",
-                "--ctx-size", "2048",     # Default context size (adjust based on needs)
-                "--parallel", "2",        # Enable request parallelism
-                "--cont-batching"         # Enable continuous batching
+                "--port", "8080"
             ]
             
             # Set up environment with CUDA variables to ensure GPU detection
