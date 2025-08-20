@@ -120,7 +120,10 @@ class LocalLLMService:
             
             # Set up environment with CUDA variables to ensure GPU detection
             env = os.environ.copy()
-            env["CUDA_VISIBLE_DEVICES"] = ""
+            if not (cuda_available and use_gpu):
+                # Only set for CPU mode to avoid conflicts
+                if "CUDA_VISIBLE_DEVICES" in env:
+                    del env["CUDA_VISIBLE_DEVICES"]
             
             # Add GPU-related parameters if CUDA is available
             if cuda_available and use_gpu:
