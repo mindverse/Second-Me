@@ -42,13 +42,18 @@ def training_data_processor(args, SYS = "You are a helpful assistant.\n\n"):
     return training_data
 
 def train(args):
+    # Read CUDA toggle from training params
+    training_params = TrainingParamsManager.get_latest_training_params()
+    use_cuda = training_params.get('use_cuda', False)
+    device = torch.device('cuda' if use_cuda and torch.cuda.is_available() else 'cpu')
+
     tokenizer = AutoTokenizer.from_pretrained(args.base_model_path, padding_side="left")
     model = AutoModelForCausalLM.from_pretrained(
-    args.base_model_path, 
-    trust_remote_code=True,
-    ignore_mismatched_sizes=True, 
-    torch_dtype=torch.float32,  # CPU doesn't support bfloat16
-)
+        args.base_model_path, 
+        trust_remote_code=True,
+        ignore_mismatched_sizes=True, 
+        torch_dtype="auto",
+    ).to(device)
     time_str = get_east_eight_time_formatted()
 
     # merged_model = model.merge_and_unload()
