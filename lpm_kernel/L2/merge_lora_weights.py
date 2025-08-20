@@ -56,16 +56,15 @@ def merge_lora_weights(base_model_path, lora_adapter_path, output_model_path):
         # Clean up memory before starting
         memory_manager.cleanup_memory(force=True)
         
-        # Explicitly set device configuration based on available hardware
+        # Use auto dtype selection instead of manually choosing based on hardware
         device_map = "auto" if use_cuda else None
-        dtype = torch.float16 if use_cuda else torch.float32
         
-        logger.info(f"Loading base model from {base_model_path} with device_map={device_map}, dtype={dtype}")
+        logger.info(f"Loading base model from {base_model_path} with device_map={device_map}, using auto dtype")
         
-        # Use explicit configuration for GPU utilization
+        # Use auto dtype configuration for optimal hardware utilization
         base_model = AutoModelForCausalLM.from_pretrained(
             base_model_path,
-            torch_dtype=dtype,
+            torch_dtype="auto",
             device_map=device_map
         )
         

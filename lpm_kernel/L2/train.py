@@ -332,8 +332,20 @@ def main(model_args, data_args, training_args):
     # Configure quantization if requested
     if model_args.use_4bit_quantization:
         from transformers import BitsAndBytesConfig
-        compute_dtype = getattr(torch, model_args.bnb_4bit_compute_dtype)
-        quant_storage_dtype = getattr(torch, model_args.bnb_4bit_quant_storage_dtype)
+        
+        # Handle "auto" dtype appropriately
+        if model_args.bnb_4bit_compute_dtype == "auto":
+            # Let BitsAndBytesConfig handle the dtype automatically
+            compute_dtype = "auto"
+        else:
+            # Use the specified dtype
+            compute_dtype = getattr(torch, model_args.bnb_4bit_compute_dtype)
+        
+        # Storage dtype follows the same pattern
+        if model_args.bnb_4bit_quant_storage_dtype == "auto":
+            quant_storage_dtype = "auto"
+        else:
+            quant_storage_dtype = getattr(torch, model_args.bnb_4bit_quant_storage_dtype)
         
         model_kwargs["quantization_config"] = BitsAndBytesConfig(
             load_in_4bit=model_args.use_4bit_quantization,

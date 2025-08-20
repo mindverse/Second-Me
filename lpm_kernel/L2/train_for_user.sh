@@ -5,7 +5,6 @@ LEARNING_RATE="2e-4"
 NUM_TRAIN_EPOCHS="3"
 CONCURRENCY_THREADS="2"
 DATA_SYNTHESIS_MODE="low"
-HALF=False
 USE_CUDA=False  # Default to False, will be overridden by parameter
 IS_COT=False
 
@@ -71,19 +70,11 @@ if [ "$CONCURRENCY_THREADS" != "1" ]; then
   echo "Set thread environment variables to $CONCURRENCY_THREADS"
 fi
 
-# Add BF16 option based on the platform and CUDA availability
-if [ "$PLATFORM" != "apple" ] && [ "$USE_CUDA" == "True" ]; then
-  HALF=True
-  echo "Enabling BF16 half precision for non-Apple platform with CUDA"
-else
-  echo "Using standard precision (not using BF16)"
-fi
-
 # Print environment for debugging
 echo "Environment configuration:"
 echo "  CUDA_VISIBLE_DEVICES: ${CUDA_VISIBLE_DEVICES}"
 echo "  PYTORCH_CUDA_ALLOC_CONF: ${PYTORCH_CUDA_ALLOC_CONF}"
-echo "  Using half precision: ${HALF}"
+echo "  Using automatic mixed precision"
 
 # Execute training script with parameters from environment variables
 python lpm_kernel/L2/train.py \
@@ -103,7 +94,6 @@ python lpm_kernel/L2/train.py \
   --save_strategy "steps" \
   --save_steps 5 \
   --push_to_hub False \
-  --bf16 $HALF \
   --packing False \
   --learning_rate $LEARNING_RATE \
   --lr_scheduler_type "cosine" \
@@ -121,7 +111,8 @@ python lpm_kernel/L2/train.py \
   --lora_target_modules "all-linear" \
   --use_4bit_quantization False \
   --use_nested_quant False \
-  --bnb_4bit_compute_dtype "bfloat16" \
+  --bnb_4bit_compute_dtype "auto" \
+  --bnb_4bit_quant_storage_dtype "auto" \
   --is_cot $IS_COT \
   --use_cuda $USE_CUDA
 

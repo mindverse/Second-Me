@@ -74,14 +74,12 @@ class MemoryManager:
             "gradient_accumulation_steps": 1,
         }
         
-        # Enable mixed precision based on hardware support
+        # Let PyTorch automatically decide the best dtype if CUDA is available
         if self.cuda_available:
-            capability = torch.cuda.get_device_capability()
-            if capability[0] >= 8:  # Ampere or newer (supports BF16)
-                config["bf16"] = True
-            elif capability[0] >= 7:  # Volta or newer (supports FP16)
-                config["fp16"] = True
-                
+            # Instead of manually checking capabilities, use "auto" dtype
+            # PyTorch will automatically select the best precision for the hardware
+            config["dtype"] = "auto"
+            
             # Adjust accumulation steps based on available memory
             vram_gb = self.get_memory_info().get("vram_total_gb", 0)
             if vram_gb < 8:  # Small GPUs

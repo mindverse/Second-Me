@@ -310,6 +310,9 @@ def create_and_prepare_model(args, data_args, training_args, model_kwargs=None):
     if cuda_available and use_cuda_requested:
         device = "cuda"
         model_kwargs["device_map"] = "auto"
+        # Use auto dtype instead of hardcoded dtype
+        if "torch_dtype" not in model_kwargs:
+            model_kwargs["torch_dtype"] = "auto"
     else:
         if use_cuda_requested and not cuda_available:
             logger.warning("⚠️ CUDA was requested but is not available on this system. Falling back to CPU.")
@@ -326,8 +329,19 @@ def create_and_prepare_model(args, data_args, training_args, model_kwargs=None):
     # Use model_kwargs quantization_config if provided, otherwise build it
     if "quantization_config" not in model_kwargs:
         if args.use_4bit_quantization:
-            compute_dtype = getattr(torch, args.bnb_4bit_compute_dtype)
-            quant_storage_dtype = getattr(torch, args.bnb_4bit_quant_storage_dtype)
+            # Handle "auto" dtype appropriately
+            if args.bnb_4bit_compute_dtype == "auto":
+                # Let BitsAndBytesConfig handle the dtype automatically
+                compute_dtype = "auto"
+            else:
+                # Use the specified dtype
+                compute_dtype = getattr(torch, args.bnb_4bit_compute_dtype)
+            
+            # Storage dtype follows the same pattern
+            if args.bnb_4bit_quant_storage_dtype == "auto":
+                quant_storage_dtype = "auto"
+            else:
+                quant_storage_dtype = getattr(torch, args.bnb_4bit_quant_storage_dtype)
 
             bnb_config = BitsAndBytesConfig(
                 load_in_4bit=args.use_4bit_quantization,
@@ -337,11 +351,6 @@ def create_and_prepare_model(args, data_args, training_args, model_kwargs=None):
                 bnb_4bit_quant_storage=quant_storage_dtype,
             )
             model_kwargs["quantization_config"] = bnb_config
-
-            if compute_dtype == torch.float16 and args.use_4bit_quantization:
-                major, _ = torch.cuda.get_device_capability() if torch.cuda.is_available() else (0, 0)
-                if major >= 8:
-                    logger.info("Your GPU supports bfloat16, you can accelerate training with the argument --bf16")
         elif args.use_8bit_quantization:
             bnb_config = BitsAndBytesConfig(load_in_8bit=args.use_8bit_quantization)
             model_kwargs["quantization_config"] = bnb_config
@@ -358,7 +367,7 @@ def create_and_prepare_model(args, data_args, training_args, model_kwargs=None):
             unsloth_kwargs = {
                 "model_name": args.model_name_or_path,
                 "max_seq_length": data_args.max_seq_length,
-                "dtype": None,
+                "dtype": "auto",  # Use auto dtype for automatic precision selection
                 "load_in_4bit": args.use_4bit_quantization,
                 "load_in_8bit": args.use_8bit_quantization,
                 "trust_remote_code": True,
@@ -383,6 +392,10 @@ def create_and_prepare_model(args, data_args, training_args, model_kwargs=None):
             # Set default device_map if not specified
             if "device_map" not in load_kwargs and args.use_cuda and torch.cuda.is_available():
                 load_kwargs["device_map"] = "auto"
+            
+            # Ensure automatic dtype selection
+            if "torch_dtype" not in load_kwargs and args.use_cuda and torch.cuda.is_available():
+                load_kwargs["torch_dtype"] = "auto"
                             
             logger.info(f"Loading model with parameters: {load_kwargs}")
             model = AutoModelForCausalLM.from_pretrained(args.model_name_or_path, **load_kwargs)
@@ -396,17 +409,17 @@ def create_and_prepare_model(args, data_args, training_args, model_kwargs=None):
         memory_manager.cleanup_memory(force=True)
         
         try:
-            # Try with simpler configuration - float16 instead of bfloat16
-            logger.info("Attempting to load with float16 precision...")
+            # Try with simpler configuration - use auto dtype instead of float16
+            logger.info("Attempting to load with auto precision...")
             model = AutoModelForCausalLM.from_pretrained(
                 args.model_name_or_path,
                 device_map="auto" if torch.cuda.is_available() and args.use_cuda else None,
-                torch_dtype=torch.float16 if torch.cuda.is_available() and args.use_cuda else None,
+                torch_dtype="auto" if torch.cuda.is_available() and args.use_cuda else None,
                 trust_remote_code=True
             )
         except (RuntimeError, torch.cuda.OutOfMemoryError, MemoryError) as e:
             # If that fails too, try even more conservative loading
-            logger.warning(f"Float16 loading failed: {str(e)}")
+            logger.warning(f"Auto dtype loading failed: {str(e)}")
             memory_manager.cleanup_memory(force=True)
             
             try:
@@ -417,7 +430,7 @@ def create_and_prepare_model(args, data_args, training_args, model_kwargs=None):
                     device_map="auto",
                     offload_folder="offload_folder",
                     offload_state_dict=True,
-                    torch_dtype=torch.float16 if torch.cuda.is_available() else None,
+                    torch_dtype="auto" if torch.cuda.is_available() else None,
                     trust_remote_code=True,
                     low_cpu_mem_usage=True
                 )
