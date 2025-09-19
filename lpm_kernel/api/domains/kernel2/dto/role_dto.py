@@ -1,5 +1,5 @@
 """
-Role realted data structure
+Role related data structure
 """
 from dataclasses import dataclass
 from typing import Dict, Any, Optional

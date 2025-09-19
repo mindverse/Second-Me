@@ -3300,7 +3300,7 @@ class InternLM2Model(Model):
                 toktype = SentencePieceTokenTypes.UNUSED
             elif tokenizer.IsByte(token_id):
                 toktype = SentencePieceTokenTypes.BYTE
-            # take care of ununsed raw token
+            # take care of unused raw token
             if piece.startswith("[UNUSED"):
                 toktype = SentencePieceTokenTypes.UNUSED
 
