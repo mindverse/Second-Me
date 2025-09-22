@@ -79,8 +79,8 @@ export default function PlaygroundChat() {
   }, [loadInfo, modelType]);
   const originSettings = useMemo(() => {
     return {
-      enableL0Retrieval: true,
-      enableL1Retrieval: true,
+      enableL0Retrieval: false,
+      enableL1Retrieval: false,
       enableHelperModel: false,
       selectedModel: 'ollama',
       apiKey: 'http://localhost:11434',

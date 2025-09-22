@@ -69,7 +69,7 @@ class MySQLRepository(BaseRepository[T]):
                 return cursor.rowcount > 0
 
     async def list(
-        self, filters: dict = None, limit: int = 100, offset: int = 0
+        self, filters: dict = None, limit: int = 1000, offset: int = 0
     ) -> List[T]:
         async with self.pool.acquire() as conn:
             async with conn.cursor(aiomysql.DictCursor) as cursor:

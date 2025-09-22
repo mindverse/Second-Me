@@ -41,6 +41,41 @@ def list_documents():
         return jsonify(APIResponse.error(message=f"Error listing documents: {str(e)}"))
 
 
+@document_bp.route("/documents/page", methods=["GET"])
+def page_documents():
+    """
+    List documents with pagination
+    Query Parameters:
+        page (int): Page number
+        page_size (int): Number of items per page
+        include_l0 (bool): Whether to include L0 data (chunks and embeddings)
+    """
+    try:
+        page = int(request.args.get("page", 1))
+        page_size = int(request.args.get("page_size", 100))
+        include_l0 = request.args.get("include_l0", "").lower() == "true"
+        if include_l0:
+            documents = document_service.page_documents_with_l0(page, page_size)
+            if not documents:
+                return jsonify(
+                    APIResponse.error(message="No documents found for the given page")
+                )
+            return jsonify(APIResponse.success(data=documents))
+        else:
+            documents = document_service.page_documents(page, page_size)
+            if not documents:
+                return jsonify(
+                    APIResponse.error(message="No documents found for the given page")
+                )
+            return jsonify(
+                APIResponse.success(data=[doc.to_dict() for doc in documents])
+            )
+
+    except Exception as e:
+        logger.error(f"Error listing documents: {str(e)}", exc_info=True)
+        return jsonify(APIResponse.error(message=f"Error listing documents: {str(e)}"))
+
+
 @document_bp.route("/documents/scan", methods=["POST"])
 @validate()
 def scan_documents():

@@ -22,6 +22,7 @@ from tqdm import tqdm
 from transformers import HfArgumentParser, TrainingArguments, set_seed
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 from trl import SFTTrainer, SFTConfig, DataCollatorForCompletionOnlyLM
+from lpm_kernel.configs.logging import TRAIN_LOG_FILE
 
 # Local imports
 from lpm_kernel.L2.utils import (
@@ -53,17 +54,52 @@ class DebugCallback(transformers.TrainerCallback):
     def __init__(self):
         self.total_time = 0
         self.last_time = time.time()
-        
+        self.total_steps = 0
+        self.current_step = 0
+        self.progress_percentage = 0.0
+        self.progress_file = os.path.join(os.path.dirname(TRAIN_LOG_FILE), "train_progress.json")
+
+    def on_train_begin(self, args, state, control, **kwargs):
+        self.total_steps = state.max_steps
+        progress_data = {
+            "percentage": 0.0,
+            "current_step": 0,
+            "total_steps": self.total_steps
+        }
+        self._write_progress_to_file(progress_data)
+        logger.info(f"Training started. Total steps: {self.total_steps}")
+
+    def _write_progress_to_file(self, progress_data):
+        try:
+            import json
+            with open(self.progress_file, 'w', encoding='utf-8') as f:
+                json_str = json.dumps(progress_data)
+                f.write(json_str)
+        except Exception as e:
+            logger.error(f"Error writing progress to file: {str(e)}")
+
     def on_step_end(self, args, state, control, **kwargs):
-        if state.global_step % 10 == 0:
-            current_time = time.time()
-            step_time = current_time - self.last_time
-            self.total_time += step_time
-            self.last_time = current_time
+
+        current_time = time.time()
+        step_time = current_time - self.last_time
+        self.total_time += step_time
+        self.last_time = current_time
+        self.current_step = state.global_step
             
-            # Log step time and training progress
-            logger.info(f"Step {state.global_step}: {step_time:.2f}s - Total training time: {self.total_time:.2f}s")
-            
+        # Log step time and training progress
+        logger.info(f"Step {state.global_step}: {step_time:.2f}s - Total training time: {self.total_time:.2f}s")
+
+        self.progress_percentage = min(100.0, (self.current_step / self.total_steps) * 100)
+        progress_data = {
+            "percentage": self.progress_percentage,
+            "current_step": self.current_step,
+            "total_steps": self.total_steps
+        }
+        self._write_progress_to_file(progress_data)
+        
+        logger.info(
+            f"Updated train_progress: percentage={self.progress_percentage}, current_step={self.current_step}, total_steps={self.total_steps}")
+
     def on_epoch_end(self, args, state, control, **kwargs):
         logger.info(f"Epoch {state.epoch} completed")
 

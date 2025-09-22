@@ -6,9 +6,13 @@ source "$SCRIPT_DIR/utils/logging.sh"
 source "$SCRIPT_DIR/utils/os_detection.sh"
 source "$SCRIPT_DIR/utils/install_config.sh"
 source "$SCRIPT_DIR/utils/python_tools.sh"
+source "$SCRIPT_DIR/utils/header_display.sh"
 
 # Version
 VERSION="1.0.0"
+
+# Use China mirrors
+USE_CHINA_MIRROR=false
 
 # Total number of stages
 TOTAL_STAGES=6
@@ -24,27 +28,7 @@ cleanup() {
     exit 1
 }
 
-# Display title and logo
-display_header() {
-    local title="$1"
-    
-    echo ""
-    echo -e "${CYAN}"
-    echo ' ███████╗███████╗ ██████╗ ██████╗ ███╗   ██╗██████╗       ███╗   ███╗███████╗'
-    echo ' ██╔════╝██╔════╝██╔════╝██╔═══██╗████╗  ██║██╔══██╗      ████╗ ████║██╔════╝'
-    echo ' ███████╗█████╗  ██║     ██║   ██║██╔██╗ ██║██║  ██║█████╗██╔████╔██║█████╗  '
-    echo ' ╚════██║██╔══╝  ██║     ██║   ██║██║╚██╗██║██║  ██║╚════╝██║╚██╔╝██║██╔══╝  '
-    echo ' ███████║███████╗╚██████╗╚██████╔╝██║ ╚████║██████╔╝      ██║ ╚═╝ ██║███████╗'
-    echo ' ╚══════╝╚══════╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═══╝╚═════╝       ╚═╝     ╚═╝╚══════╝'
-    echo -e "${NC}"
-    echo -e "${BOLD}Second-Me Setup Script v${VERSION}${NC}"
-    echo -e "${GRAY}$(date)${NC}\n"
-    
-    if [ -n "$title" ]; then
-        echo -e "${CYAN}====== $title ======${NC}"
-        echo ""
-    fi
-}
+
 
 # Display stage start
 display_stage() {
@@ -200,7 +184,7 @@ install_graphrag() {
     
     # Check the current graphrag version in Poetry environment
     log_step "Checking graphrag version in Poetry environment"
-    GRAPHRAG_VERSION=$(poetry run pip show graphrag 2>/dev/null | grep "Version:" | cut -d " " -f2)
+    GRAPHRAG_VERSION=$(poetry run pip show graphrag 2>/dev/null | awk '/^Versi  on: / {print $2; exit}')
     GRAPHRAG_TARGET="1.2.1.dev27"
     GRAPHRAG_LOCAL_PATH="dependencies/graphrag-${GRAPHRAG_TARGET}.tar.gz"
 
@@ -378,14 +362,78 @@ show_help() {
     echo -e "Options:"
     echo -e "  --help\t\tShow this help information"
     echo -e "  --require-confirmation\tRequire confirmation when warnings are present"
+    echo -e "  --china\t\tUse China mirrors for npm, pip and Poetry packages"
     echo
     echo -e "Examples:"
     echo -e "  $0 \t\t\tPerform full installation"
     echo -e "  $0 python\t\tSetup Python environment only"
-    echo -e "  $0 --require-confirmation\tRequire confirmation when warnings are present"
+    echo -e "  $0 --china\t\tPerform full installation with China mirrors"
     echo
     echo -e "For a complete list of all available commands, run:"
     echo -e "  make help"
+}
+
+# Configure China mirrors for all package managers
+configure_china_mirrors() {
+    log_section "CONFIGURING CHINA MIRRORS"
+    
+    # 1. Configure npm
+    log_step "Configuring npm to use Taobao mirror"
+    if command -v npm &>/dev/null; then
+        log_info "Setting npm registry to Taobao mirror..."
+        npm config set registry https://registry.npmmirror.com
+        log_success "npm configured to use Taobao mirror"
+    else
+        log_warning "npm not found, skipping npm mirror configuration"
+    fi
+    
+    # 2. Configure pip
+    log_step "Configuring pip to use Aliyun mirror (for current session)"
+    local python_cmd=$(get_python_command)
+    if [ -n "$python_cmd" ]; then
+        # Set environment variables for current session
+        export PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+        export PIP_TRUSTED_HOST=mirrors.aliyun.com
+        
+        # Add these exports to the active .bashrc or .zshrc to persist across sessions
+        log_info "Environment variables set for current session:"
+        log_info "  PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/"
+        log_info "  PIP_TRUSTED_HOST=mirrors.aliyun.com"
+        log_success "pip configured to use Aliyun mirror for current session"
+    else
+        log_warning "python not found, skipping pip mirror configuration"
+    fi
+    
+    # 3. Configure Poetry
+    log_step "Configuring Poetry to use Aliyun and Tsinghua mirrors"
+    if command -v poetry &>/dev/null; then
+        log_info "Checking and setting up Poetry mirrors..."
+        
+        # Get current sources
+        CURRENT_SOURCES=$(poetry source list 2>/dev/null)
+        
+        # Check and add Aliyun mirror if it doesn't exist
+        if ! echo "$CURRENT_SOURCES" | grep -q "aliyun"; then
+            log_info "Adding Aliyun mirror as primary source..."
+            poetry source add --priority=primary aliyun https://mirrors.aliyun.com/pypi/simple/
+        else
+            log_info "Aliyun mirror already configured, skipping..."
+        fi
+        
+        # Check and add Tsinghua mirror if it doesn't exist
+        if ! echo "$CURRENT_SOURCES" | grep -q "tsinghua"; then
+            log_info "Adding Tsinghua mirror as supplemental source..."
+            poetry source add --priority=supplemental tsinghua https://pypi.tuna.tsinghua.edu.cn/simple
+        else
+            log_info "Tsinghua mirror already configured, skipping..."
+        fi
+
+        log_success "Poetry mirror configuration complete"
+    else
+        log_warning "poetry not found, skipping Poetry mirror configuration"
+    fi
+    
+    log_section "CHINA MIRRORS CONFIGURATION COMPLETE"
 }
 
 # Check system requirements
@@ -591,6 +639,11 @@ parse_args() {
                 REQUIRE_CONFIRMATION=true
                 shift
                 ;;
+            --china)
+                USE_CHINA_MIRROR=true
+                log_info "Using China mirrors for package installations"
+                shift
+                ;;
             python|llama|frontend)
                 COMPONENT="$1"
                 shift
@@ -612,6 +665,11 @@ main() {
     
     # Parse command line arguments
     parse_args "$@"
+    
+    # Configure China mirrors if specified
+    if [ "$USE_CHINA_MIRROR" = true ]; then
+        configure_china_mirrors
+    fi
     
     # All pre-installation checks
     log_section "Running pre-installation checks"

@@ -22,7 +22,7 @@ class TrainingParamsManager:
         "learning_rate": 1e-4,
         "number_of_epochs": 3,
         "concurrency_threads": 2,
-        "data_synthesis_mode": "low",
+        "data_synthesis_mode": "high",
         "use_cuda": False,  # Default to using CUDA when available
         "is_cot": False
     }

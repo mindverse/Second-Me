@@ -23,6 +23,7 @@ export type StageStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | '
 
 interface TrainStep {
   completed: boolean;
+  current_file?: string;
   name: string;
   status: StepStatus;
   path?: string;

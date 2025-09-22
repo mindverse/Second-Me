@@ -137,7 +137,7 @@ export default function TrainPage() {
   };
 
   const handleDeleteMemory = async (id: string, name: string) => {
-    const res = await deleteMemory(name);
+    const res = await deleteMemory(id);
 
     if (res.data.code === 0) {
       setMemories((prev) => {

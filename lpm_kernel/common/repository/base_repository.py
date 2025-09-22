@@ -48,7 +48,21 @@ class BaseRepository(Generic[T]):
                 session.rollback()
                 raise
 
-    def list(self, filters: dict = None, limit: int = 100, offset: int = 0) -> List[T]:
+    def list(self, filters: dict = None) -> List[T]:
+        """Return all records that match the given filters without pagination"""
+        with self._db.session() as session:
+            try:
+                query = select(self.model)
+                if filters:
+                    query = query.filter_by(**filters)
+                results = session.scalars(query).all()
+                return [self.model.from_dict(item.to_dict()) for item in results]
+            except Exception as e:
+                session.rollback()
+                raise
+
+    def page(self, limit: int = 100, offset: int = 0, filters: dict = None) -> List[T]:
+        """Return paginated records that match the given filters"""
         with self._db.session() as session:
             try:
                 query = select(self.model)

@@ -27,6 +27,7 @@ data/sqlite/*
 data/uploads/*
 data/progress/*
 lpm_frontend/node_modules
+lpm_frontend/yarn.lock
 
 # L2 Model Storage
 resources/model/output/merged_model/*

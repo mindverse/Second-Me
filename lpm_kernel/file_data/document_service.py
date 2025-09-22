@@ -58,6 +58,17 @@ class DocumentService:
         """
         return self._repository.list()
 
+    def page_documents(self, page: int, page_size: int) -> List[Document]:
+        """
+        get paginated doc list
+        Args:
+            page (int): page number
+            page_size (int): page size
+        Returns:
+            List[Document]: doc object list
+        """
+        return self._repository.page(limit=page_size, offset=(page - 1) * page_size)
+
     def scan_directory(
         self, directory_path: str, recursive: bool = False
     ) -> List[DocumentDTO]:
@@ -369,6 +380,32 @@ class DocumentService:
 
         return documents_with_l0
 
+    def page_documents_with_l0(self, page: int, page_size: int) -> List[Dict]:
+        """
+        get paginated docs' L0 data
+        Args:
+            page (int): page number
+            page_size (int): page size
+        Returns:
+            List[Dict]: list of dict of docs with L0 data
+        """
+        documents = self.page_documents(page, page_size)
+        logger.info(f"page_documents len: {len(documents)}")
+
+        documents_with_l0 = []
+        for doc in documents:
+            doc_dict = doc.to_dict()
+            try:
+                l0_data = self.get_document_l0(doc.id)
+                doc_dict["l0_data"] = l0_data
+                logger.info(f"success getting L0 data for document {doc.id} success")
+            except Exception as e:
+                logger.error(f"Error getting L0 data for document {doc.id}: {str(e)}")
+                doc_dict["l0_data"] = None
+            documents_with_l0.append(doc_dict)
+
+        return documents_with_l0
+
     def get_document_by_id(self, document_id: int) -> Optional[Document]:
         """
         get doc by ID
@@ -517,112 +554,106 @@ class DocumentService:
             logger.error(f"Error getting document embedding: {str(e)}")
             raise
 
-    def delete_file_by_name(self, filename: str) -> bool:
+    def delete_file_by_id(self, document_id: int) -> bool:
         """
+        Delete a document by its ID
+
         Args:
-            filename (str): name to delete
-            
+            document_id (int): The ID of the document to delete
+
         Returns:
-            bool: if success
-            
-        Raises:
-            Exception: error occurred
+            bool: True if deletion successful, False otherwise
         """
-        logger.info(f"Starting to delete file: {filename}")
-        
+        logger.info(f"Starting to delete file with ID: {document_id}")
+
         try:
-            # 1. search memories
+            # 1. Get document object
+            document = self._repository.get_by_id(document_id)
+
+            if not document:
+                logger.warning(f"Document with ID {document_id} not found")
+                return False
+
+            logger.info(f"Document found: {document}")
+
+            # 2. Find related memory record
             db = DatabaseSession()
             memory = None
-            document_id = None
-            
+            file_path = None
+
             with db._session_factory() as session:
-                query = select(Memory).where(Memory.name == filename)
-                result = session.execute(query)
-                memory = result.scalar_one_or_none()
-                
-                if not memory:
-                    logger.warning(f"File record not found: {filename}")
-                    return False
-                
-                # get related document_id
-                document_id = memory.document_id
-                
-                # get filepath
-                file_path = memory.path
-                
-                # 2. delete memory
-                session.delete(memory)
-                session.commit()
-                logger.info(f"Deleted record from memories table: {filename}")
-            
-            # if no related document, only delete physical file
-            if not document_id:
-                # delete physical file
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-                    logger.info(f"Deleted physical file: {file_path}")
-                return True
-            
-            # 3. get doc obj
-            document = self._repository.get_by_id(document_id)
-            if not document:
-                logger.warning(f"Corresponding document record not found, ID: {document_id}")
-                # if no document record, delete physical file
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-                    logger.info(f"Deleted physical file: {file_path}")
-                return True
-            
-            # 4. get all chunks
-            chunks = self._repository.find_chunks(document_id)
-            
-            # 5. delete doc embedding from ChromaDB
-            try:
-                self.embedding_service.document_collection.delete(
-                    ids=[str(document_id)]
-                )
-                logger.info(f"Deleted document embedding from ChromaDB, ID: {document_id}")
-            except Exception as e:
-                logger.error(f"Error deleting document embedding: {str(e)}")
-            
-            # 6. delete all chunk embedding from ChromaDB
-            if chunks:
-                try:
-                    chunk_ids = [str(chunk.id) for chunk in chunks]
-                    self.embedding_service.chunk_collection.delete(
-                        ids=chunk_ids
+                # Find memory record
+                query = select(Memory).where(Memory.document_id == document_id)
+                memory = session.execute(query).scalar_one_or_none()
+
+                if memory:
+                    # Get file path
+                    file_path = memory.path
+
+                    # Delete memory record
+                    session.delete(memory)
+                    session.commit()
+                    logger.info(
+                        f"Deleted record from memories table for document ID: {document_id}"
                     )
-                    logger.info(f"Deleted {len(chunk_ids)} chunk embeddings from ChromaDB")
+
+                # 3. Get all chunks
+                chunks = self._repository.find_chunks(document_id)
+
+                # 4. Delete document embedding from ChromaDB
+                try:
+                    self.embedding_service.document_collection.delete(
+                        ids=[str(document_id)]
+                    )
+                    logger.info(
+                        f"Deleted document embedding from ChromaDB, ID: {document_id}"
+                    )
                 except Exception as e:
-                    logger.error(f"Error deleting chunk embeddings: {str(e)}")
-            
-            # 7. delete all chunks embedding from ChromaDB
-            with db._session_factory() as session:
+                    logger.error(f"Error deleting document embedding: {str(e)}")
+
+                # 5. Delete all chunk embeddings from ChromaDB
+                if chunks:
+                    try:
+                        chunk_ids = [str(chunk.id) for chunk in chunks]
+                        self.embedding_service.chunk_collection.delete(ids=chunk_ids)
+                        logger.info(
+                            f"Deleted {len(chunk_ids)} chunk embeddings from ChromaDB"
+                        )
+                    except Exception as e:
+                        logger.error(f"Error deleting chunk embeddings: {str(e)}")
+
+                # 6. Delete all chunks from database
                 from lpm_kernel.file_data.models import ChunkModel
+
                 session.query(ChunkModel).filter(
                     ChunkModel.document_id == document_id
                 ).delete()
                 session.commit()
-                logger.info(f"Deleted all related chunks")
-                
-                # delete doc record
+                logger.info(
+                    f"Deleted all related chunks for document ID: {document_id}"
+                )
+
+                # 7. Delete document record
                 doc_entity = session.get(Document, document_id)
                 if doc_entity:
                     session.delete(doc_entity)
                     session.commit()
-                    logger.info(f"Deleted document record from database, ID: {document_id}")
-            
-            # 8. delete physical file
-            if os.path.exists(file_path):
-                os.remove(file_path)
-                logger.info(f"Deleted physical file: {file_path}")
-            
+                    logger.info(
+                        f"Deleted document record from database, ID: {document_id}"
+                    )
+
+                # 8. Delete physical file
+                if file_path and os.path.exists(file_path):
+                    os.remove(file_path)
+                    logger.info(f"Deleted physical file: {file_path}")
+
             return True
-            
+
         except Exception as e:
-            logger.error(f"Error deleting file: {str(e)}", exc_info=True)
-            raise
+            logger.error(
+                f"Error deleting file with ID {document_id}: {str(e)}", exc_info=True
+            )
+            return False
 
     def fix_missing_document_analysis(self) -> int:
         """Fix documents with missing insights or summaries

@@ -26,7 +26,28 @@ const ThinkingModelModal = (props: IProps) => {
   }, [open]);
 
   useEffect(() => {
-    setThinkingModelParams(thinkingModelConfig);
+    // If backend returned data
+    if (thinkingModelConfig) {
+      const updatedParams = {...thinkingModelConfig};
+      
+      // Check fields, if null/undefined then set default values
+      if (updatedParams.thinking_model_name === null || updatedParams.thinking_model_name === undefined) {
+        updatedParams.thinking_model_name = "deepseek-reasoner";
+      }
+      
+      if (updatedParams.thinking_endpoint === null || updatedParams.thinking_endpoint === undefined) {
+        updatedParams.thinking_endpoint = "https://api.deepseek.com";
+      }
+      
+      setThinkingModelParams(updatedParams);
+    } else {
+      // Set complete default values when no configuration exists
+      setThinkingModelParams({
+        thinking_model_name: "deepseek-reasoner",
+        thinking_endpoint: "https://api.deepseek.com",
+        thinking_api_key: ""
+      });
+    }
   }, [thinkingModelConfig]);
 
   const handleUpdate = () => {
@@ -75,6 +96,7 @@ const ThinkingModelModal = (props: IProps) => {
             <Input
               autoComplete="off"
               className="w-full"
+              disabled
               onChange={(e) =>
                 setThinkingModelParams({
                   ...thinkingModelParams,
@@ -109,6 +131,7 @@ const ThinkingModelModal = (props: IProps) => {
           <Input
             autoComplete="off"
             className="w-full"
+            disabled
             onChange={(e) =>
               setThinkingModelParams({
                 ...thinkingModelParams,

@@ -21,7 +21,8 @@ class TrainProgress:
                             "completed": False,
                             "status": "pending",
                             "have_output": False,
-                            "path": None
+                            "path": None,
+                            "current_file":None
                         }
                     ]
                 },
@@ -168,13 +169,14 @@ class TrainProgress:
                 step_name = step["name"].lower().replace(" ", "_")
                 self.steps_map[stage_name][step_name] = step
 
-    def update_progress(self, stage: str, step: str, currentStepStatus: Union[Status, str], stageProgress: Optional[float] = None):
+    def update_progress(self, stage: str, step: str, currentStepStatus: Union[Status, str], stageProgress: Optional[float] = None, file_name: Optional[str] = None):
         """Update progress status
         Args:
             stage: Stage key (snake_case format)
             step: Step key (snake_case format)
             currentStepStatus: Status (enum or string)
             stageProgress: Optional progress value (0-100)
+            file_name: Optional name of the file being processed (for download tracking)
         """
         stage_data = self.stage_map[stage]
         status_value = currentStepStatus.value if isinstance(currentStepStatus, Status) else currentStepStatus
@@ -183,6 +185,10 @@ class TrainProgress:
         # Update step status
         step_data["status"] = status_value
         step_data["completed"] = status_value == "completed"
+        
+        # Update file name if provided (for tracking downloads)
+        if file_name is not None:
+            step_data["current_file"] = file_name
         
         # Update stage progress
         self._update_stage_progress(stage_data, stageProgress)

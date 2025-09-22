@@ -25,7 +25,7 @@ export default function OnboardingTutorial({ onComplete, onClose }: OnboardingTu
       image: '/images/step_3.png'
     },
     {
-      title: 'Join AI Network',
+      title: 'Export your Second Me',
       description:
         'Explore interactions between your Second Me and other AI entities in the network.',
       image: '/images/step_4.png'

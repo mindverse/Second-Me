@@ -244,6 +244,19 @@ const TrainingProgress = (props: TrainingProgressProps) => {
                             >
                               {step.name}
                             </span>
+
+                            {/* Current downloading file name */}
+                            {step.name === 'Model Download' &&
+                            step.status !== 'completed' &&
+                            !!step.current_file ? (
+                              <span
+                                className={classNames('text-xs ml-2', 'text-blue-600 font-medium')}
+                              >
+                                <span className="mr-2">{'-'}</span>
+                                <span>{step.current_file}</span>
+                              </span>
+                            ) : null}
+
                             {step.completed && step.have_output && (
                               <span
                                 className="text-xs text-blue-500 underline cursor-pointer hover:text-blue-600"

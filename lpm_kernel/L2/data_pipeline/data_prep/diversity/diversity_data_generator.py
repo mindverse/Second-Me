@@ -72,7 +72,7 @@ class DiversityDataGenerator:
             self.model_name = user_llm_config.thinking_model_name
             self.api_key = user_llm_config.thinking_api_key
             self.base_url = user_llm_config.thinking_endpoint
-            if self.model_name.startswith("deepseek"):
+            if "deepseek" in self.model_name:
                 self.client = openai.OpenAI(api_key=self.api_key, base_url=self.base_url)
             else:
                 logger.error(f"Error model_name, longcot data generating model_name: deepseek series")
@@ -496,11 +496,7 @@ class DiversityDataGenerator:
                 model=self.model_name,
                 messages=messages,
             )
-            if self.is_cot:
-                response_message = response.choices[0].message
-                res = "<think>" + response_message.reasoning_content + "</think>" + response_message.content
-            else:
-                res = response.choices[0].message.content
+            res = response.choices[0].message.content
         except Exception as e:
             logging.error(traceback.format_exc())
         
@@ -547,12 +543,39 @@ class DiversityDataGenerator:
                 model=self.model_name,
                 messages=messages,
             )
+            result = response.choices[0].message
             if self.is_cot:
-                response_message = response.choices[0].message
-                res = "<think>" + response_message.reasoning_content + "</think>" + response_message.content
+                if hasattr(result, 'reasoning_content'):
+                    if not result.reasoning_content.startswith("<think>"):
+                        reasoning_content = f"<think>{result.reasoning_content}"
+                        if not result.reasoning_content.endswith("</think>"):
+                            reasoning_content += "</think>"
+                    else:
+                        reasoning_content = result.reasoning_content
+                    if not result.content.strip().startswith("<answer>"):
+                        content = f"<answer>{result.content.strip()}"
+                        if not result.content.strip().endswith("</answer>"):
+                            content += "</answer>"
+                    else:
+                        content = result.content
+                else:
+                    if not result.content.startswith("<answer>"):
+                        reasoning_content, content = result.content.split("</think>")
+                        if result.content.startswith("<think>"):
+                            reasoning_content += "</think>"
+                        else:
+                            reasoning_content = f"<think>{reasoning_content}</think>"
+                        if not content.strip().startswith("<answer>"):
+                            content = f"<answer>{content.strip()}</answer>"
+                        else:
+                            content = content.strip()
+                    else:
+                        reasoning_content = ""
+                        content = result.content
+                final_result = reasoning_content + "\n" + content
             else:
-                res = response.choices[0].message.content
+                final_result = result.content
         except Exception as e:
             logging.error(traceback.format_exc())
             
-        return res, answer_type
+        return final_result, answer_type

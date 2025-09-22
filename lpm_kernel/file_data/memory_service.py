@@ -90,9 +90,9 @@ class StorageService:
             file.seek(0)  # reset file pointer to start position
 
             # check if file already exists
-            existing_memory = self.check_file_exists(file.filename, filesize)
-            if existing_memory:
-                raise ValueError(f"File '{file.filename}' already exists")
+            # existing_memory = self.check_file_exists(file.filename, filesize)
+            # if existing_memory:
+            #     raise ValueError(f"File '{file.filename}' already exists")
 
             # save file to disk
             filepath, filename, filesize = self._save_file_to_disk(file)
@@ -117,7 +117,7 @@ class StorageService:
                 logger.info(f"Memory record created successfully: {memory.id}")
 
                 # process document
-                document = self._process_document(filepath, metadata)
+                document = self._process_document(filepath, filename, metadata)
                 if document:
                     memory.document_id = document.id
                     session.add(memory)
@@ -156,7 +156,11 @@ class StorageService:
 
             # generate file name and path
             filename = file.filename
-            filepath = self.base_path / filename
+            # Add timestamp to filename to ensure uniqueness
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            name_parts = os.path.splitext(filename)
+            timestamped_filename = f"{name_parts[0]}_{timestamp}{name_parts[1]}"
+            filepath = self.base_path / timestamped_filename
             logger.info(f"Preparing to save file to: {filepath}")
 
             # save file
@@ -170,7 +174,7 @@ class StorageService:
             logger.error(f"Failed to save file to disk: {str(e)}", exc_info=True)
             raise
 
-    def _process_document(self, filepath, metadata=None):
+    def _process_document(self, filepath, filename, metadata=None):
         """Process document and create Document record
 
         Args:
@@ -188,8 +192,8 @@ class StorageService:
             )
 
             request = CreateDocumentRequest(
-                name=doc.name,
-                title=metadata.get("name", doc.name) if metadata else doc.name,
+                name=filename,
+                title=metadata.get("name", filename) if metadata else filename,
                 mime_type=doc.mime_type,
                 user_description=metadata.get("description", "Uploaded document")
                 if metadata

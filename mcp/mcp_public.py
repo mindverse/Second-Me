@@ -12,10 +12,10 @@ messages =[]
 @mindverse.tool()
 async def get_response(query:str, instance_id:str) -> str | None:
     """
-    Received a response based on public secondme model.
+    MCP server stores user preferences and memory. This method can be called when answering questions about user's own preferences or memory.
 
     Args:
-        query (str): Questions raised by users regarding the secondme model.
+        query (str): Query about user preferences or personal information
         instance_id (str): ID used to identify the secondme model, or url used to identify the secondme model.
 
     """

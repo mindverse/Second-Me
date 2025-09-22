@@ -13,11 +13,13 @@ messages =[]
 @mindv.tool()
 async def get_response(query:str) -> str | None | Any:
     """
-    Received a response based on local secondme model.
+    MCP server stores user preferences and memory. This method can be called when answering questions about user's own preferences or memory.
 
     Args:
-        query (str): Questions raised by users regarding the secondme model
+        query (str): Query about user preferences or personal information
 
+    Returns:
+        str | None | Any: Response based on user's personal data
     """
 
     headers = {

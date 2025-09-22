@@ -277,7 +277,7 @@ const Menu = () => {
               )}
               onClick={() => {
                 if (disabledChangeParams) {
-                  message.warning('Cancel the current train in order to configure the model');
+                  message.warning('Cancel the current training run to configure the model');
 
                   return;
                 }
