@@ -1,82 +1,112 @@
-from wxpy import *
+"""
+WeChat Bot with Second-Me Integration
+-------------------------------------
+This bot integrates with wxpy and Second-Me to process and respond
+to WeChat messages intelligently.
+"""
+
+import json
 import logging
 import os
-from dotenv import load_dotenv
 import sys
-import json
+from typing import Any, Optional
 
-# 添加Second-Me的路径到系统路径
-sys.path.append(os.path.join(os.path.dirname(__file__), 'lpm_kernel'))
+from dotenv import load_dotenv
+from wxpy import Bot, Message
 
-from lpm_kernel.kernel import SecondMeKernel
-from lpm_kernel.utils import load_config
+# Add Second-Me path dynamically
+sys.path.append(os.path.join(os.path.dirname(__file__), "lpm_kernel"))
 
-# 配置日志
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from lpm_kernel.kernel import SecondMeKernel  # noqa: E402
+from lpm_kernel.utils import load_config  # noqa: E402
 
-# 加载环境变量
+# -------------------------------
+# Logging Configuration
+# -------------------------------
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
+    handlers=[logging.StreamHandler()],
+)
+logger = logging.getLogger("WeChatBot")
+
+# -------------------------------
+# Load environment variables
+# -------------------------------
 load_dotenv()
 
+
 class WeChatBot:
-    def __init__(self):
-        # 初始化机器人，设置缓存路径
-        self.bot = Bot(cache_path='wxpy.pkl')
-        logger.info("微信机器人初始化成功")
-        
-        # 初始化Second-Me
+    """A WeChat Bot that integrates with Second-Me AI kernel."""
+
+    def __init__(self, cache_path: str = "wxpy.pkl") -> None:
+        """Initialize WeChatBot with wxpy and Second-Me."""
+        try:
+            self.bot: Bot = Bot(cache_path=cache_path, console_qr=False)
+            logger.info("✅ WeChat bot initialized successfully.")
+        except Exception as e:
+            logger.critical(f"❌ Failed to initialize WeChat bot: {e}")
+            raise
+
+        # Initialize Second-Me
+        self.second_me: Optional[SecondMeKernel] = None
         try:
             config = load_config()
             self.second_me = SecondMeKernel(config)
-            logger.info("Second-Me初始化成功")
+            logger.info("✅ Second-Me initialized successfully.")
         except Exception as e:
-            logger.error(f"Second-Me初始化失败: {str(e)}")
-            self.second_me = None
-        
-    def handle_message(self, msg):
-        """处理接收到的消息"""
-        try:
-            # 获取消息内容
-            content = msg.text
-            sender = msg.sender
-            
-            # 记录接收到的消息
-            logger.info(f"收到来自 {sender.name} 的消息: {content}")
-            
-            if self.second_me is None:
-                msg.reply("抱歉，Second-Me服务未正确初始化，请稍后再试。")
-                return
-                
-            # 调用Second-Me处理消息
-            response = self.second_me.process_message(content)
-            
-            # 如果响应是字典，转换为字符串
-            if isinstance(response, dict):
-                response = json.dumps(response, ensure_ascii=False)
-            
-            # 发送回复
-            msg.reply(response)
-            
-        except Exception as e:
-            logger.error(f"处理消息时出错: {str(e)}")
-            msg.reply("抱歉，处理消息时出现错误。")
+            logger.error(f"❌ Failed to initialize Second-Me: {e}")
 
-    def run(self):
-        """运行机器人"""
+    def handle_message(self, msg: Message) -> None:
+        """
+        Handle incoming WeChat messages and respond using Second-Me.
+        """
         try:
-            # 注册消息处理函数
-            @self.bot.register()
-            def print_messages(msg):
-                self.handle_message(msg)
-            
-            # 保持运行
-            self.bot.join()
-            
+            content: str = msg.text or ""
+            sender: str = getattr(msg.sender, "name", "Unknown")
+
+            logger.info(f"📩 Message received from {sender}: {content}")
+
+            if not self.second_me:
+                msg.reply("⚠️ Sorry, Second-Me service is not available right now.")
+                return
+
+            response: Any = self.second_me.process_message(content)
+
+            # Convert dict responses to JSON string
+            if isinstance(response, dict):
+                response = json.dumps(response, ensure_ascii=False, indent=2)
+
+            msg.reply(str(response))
+
         except Exception as e:
-            logger.error(f"运行机器人时出错: {str(e)}")
+            logger.exception(f"❌ Error handling message: {e}")
+            msg.reply("⚠️ An unexpected error occurred while processing your message.")
+
+    def run(self) -> None:
+        """
+        Run the WeChat bot and keep it alive.
+        """
+        try:
+            @self.bot.register()
+            def _(msg: Message) -> None:  # noqa: F811
+                self.handle_message(msg)
+
+            logger.info("🚀 WeChat bot is now running. Press Ctrl+C to stop.")
+            self.bot.join()
+
+        except KeyboardInterrupt:
+            logger.warning("🛑 Bot stopped manually by user.")
+            self.bot.logout()
+        except Exception as e:
+            logger.exception(f"❌ Fatal error while running the bot: {e}")
             self.bot.logout()
 
+
 if __name__ == "__main__":
-    # 创建并运行机器人
-    bot = WeChatBot()
-    bot.run() 
+    try:
+        bot = WeChatBot()
+        bot.run()
+    except Exception as e:
+        logger.critical(f"❌ Unable to start bot: {e}")
+        sys.exit(1)
