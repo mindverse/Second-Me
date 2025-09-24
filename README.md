@@ -35,6 +35,7 @@ Start training your Second Me today with your own memories! Using Hierarchical M
 
 ### **Scale Your Intelligence** on the Second Me Network
 Launch your AI self from your laptop onto our decentralized network—anyone or any app can connect with your permission, sharing your context as your digital identity.
+Testing a commit and a push
 
 <p align="center">
   <img src="https://github.com/user-attachments/assets/9a74a3f4-d8fd-41c1-8f24-534ed94c842a" width="94%" />
