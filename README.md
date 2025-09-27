@@ -10,6 +10,16 @@
 [![Reddit](https://img.shields.io/badge/Join-Reddit-FF4500?style=flat-square&logo=reddit&logoColor=white)](https://www.reddit.com/r/SecondMeAI/)
 [![View FAQ](https://img.shields.io/badge/FAQ-GitBook-blue?style=flat-square)](https://secondme.gitbook.io/secondme/faq)
 
+<!-- Keep these links. Translations will automatically update with the README. -->
+[Deutsch](https://www.readme-i18n.com/mindverse/Second-Me?lang=de) | 
+[Español](https://www.readme-i18n.com/mindverse/Second-Me?lang=es) | 
+[français](https://www.readme-i18n.com/mindverse/Second-Me?lang=fr) | 
+[日本語](https://www.readme-i18n.com/mindverse/Second-Me?lang=ja) | 
+[한국어](https://www.readme-i18n.com/mindverse/Second-Me?lang=ko) | 
+[Português](https://www.readme-i18n.com/mindverse/Second-Me?lang=pt) | 
+[Русский](https://www.readme-i18n.com/mindverse/Second-Me?lang=ru) | 
+[中文](https://www.readme-i18n.com/mindverse/Second-Me?lang=zh)
+
 </div>
 
 
