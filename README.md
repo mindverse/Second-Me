@@ -12,7 +12,7 @@
 
 </div>
 
-
+> ✅ Second demo trigger for CodeRabbit — checking if it works from my own branch.
 ## Our Vision
 
 Companies like OpenAI built "Super AI" that threatens human independence. We crave individuality: AI that amplifies, not erases, **YOU**.
