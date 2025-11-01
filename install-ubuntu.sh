@@ -247,11 +247,14 @@ install_python() {
     print_step "Installing Python 3.12..."
     sudo apt-get install -y python3.12 python3.12-venv python3.12-dev python3-pip
 
-    # Set Python 3.12 as default python3
-    sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1
+    # Do NOT change the system default python3, as this can break system tools.
+    # If you need to use Python 3.12, use 'python3.12' explicitly or create a virtual environment:
+    print_warning "System default python3 NOT changed. To use Python 3.12, use 'python3.12' or create a virtual environment:"
+    print_info "python3.12 -m venv ~/secondme-venv"
+    print_info "source ~/secondme-venv/bin/activate"
 
     print_success "Python 3.12 installed"
-    python3 --version
+    python3.12 --version
 }
 
 # Install Node.js
