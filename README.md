@@ -81,6 +81,24 @@ Star and join us, and you will receive all release notifications from GitHub wit
 
 ### ⚡ Get your Second Me running in just 3 steps:
 
+#### Option 1: Automated Ubuntu/Debian Installation (Recommended for Linux)
+
+```bash
+# One-command automated installation
+curl -fsSL https://raw.githubusercontent.com/mindverse/Second-Me/master/install-ubuntu.sh | bash
+```
+
+This script provides:
+- ✅ Interactive installation (Docker or Local setup)
+- ✅ Automatic dependency installation
+- ✅ GPU detection and setup (NVIDIA CUDA)
+- ✅ System optimization for your hardware
+- ✅ Comprehensive error handling
+
+📖 **[Deutsche Anleitung](INSTALLATION-DEUTSCH.md)** | **[Detailed Guide](docs/INSTALLATION-UBUNTU.md)**
+
+#### Option 2: Manual Docker Installation (All Platforms)
+
 ```bash
 # 1. Clone the repository
 git clone https://github.com/mindverse/Second-Me.git
