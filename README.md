@@ -91,6 +91,72 @@ make docker-up
 # Open your browser and visit: http://localhost:3000
 ```
 
+### Install and Run Second Me (WSL / Ubuntu Integrated Setup)
+
+## 0. Short Checklist Before You Start
+
+✅ Ensure WSL2 Ubuntu is updated
+
+🛠️ Node.js 23+ installed inside WSL using nvm
+
+## 1. Move Project to WSL Filesystem
+
+📂 Copy project from /mnt/c to ~/Second-Me directory
+
+📁 Use cp -r "/mnt/c/Users/..." ~/Second-Me command
+
+## 2. Install System Dependencies
+
+⚙️ Run sudo apt update and install build-essential, cmake, g++, libssl-dev, python3-dev, etc.
+
+🔧 Required tools: net-tools, libinotifytools0-dev, pkg-config
+
+## 3. Install Node.js 23 Using nvm
+
+🌐 Download and install nvm via script
+
+🔢 Install and activate Node.js version 23 using nvm commands
+
+## 4. Python Environment Setup
+
+🐍 Activate Python virtual environment (.venv) or Poetry
+
+📦 Install or upgrade huggingfacehub package
+
+## 5. Download and Merge Qwen Model
+
+⬇️ Download split Qwen2.5-7B-Instruct-GGUF model files using huggingface-cli
+
+🔗 Merge split files using llama-gguf-split --merge tool
+
+## 6. Start llama-server
+
+🚀 Launch llama-server with model, memory config, host and port parameters
+
+🔌 Example: ./llama.cpp/build/bin/llama-server -m models/qwen2.5-7b-instruct-q4km.gguf -c 4096 --host 127.0.0.1 --port 8080
+
+## 7. Fix PostHog Telemetry Spam
+
+🛑 Disable telemetry by adding TELEMETRY_DISABLED=1 to .env file
+
+## 8. Start Second Me Services
+
+🔄 Restart services using make restart command
+
+## 9. Frontend Startup Troubleshooting
+
+🖥️ Navigate to lpmfrontend directory if frontend doesn’t start automatically
+
+🔄 Use nvm to select Node.js 23, clear node_modules and .next folders, reinstall dependencies, and run frontend
+
+## 10. Kill Stale Processes or Ports
+
+❌ Free ports 3000 and 8002 using sudo fuser -k commands
+
+🛑 Kill any running next dev processes with pkill -f command
+
+
+
 👉 For detailed instructions — including integrated (non-Docker) setup, model selection, memory requirements, and platform-specific tips,
 check the full [Deployment Guide on GitBook](https://secondme.gitbook.io/secondme/guides/deployment).
 
