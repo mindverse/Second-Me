@@ -132,7 +132,8 @@ class PreferenceQAGenerator:
                 )
                 response_message = res.choices[0].message
                 if self.is_cot:
-                    return "<think>" + response_message.reasoning_content + "</think>" + response_message.content
+                    reasoning = getattr(response_message, 'reasoning_content', None) or getattr(response_message, 'reasoning', None) or ''
+                    return "<think>" + reasoning + "</think>" + response_message.content
                 else:
                     return response_message.content
             except Exception as e:

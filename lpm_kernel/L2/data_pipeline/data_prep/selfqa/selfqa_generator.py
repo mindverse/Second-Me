@@ -229,10 +229,10 @@ class SelfQA:
 
     def get_remote_response(self, messages: list) -> str:
         """Get response from OpenAI / DeepSeek API.
-        
+
         Args:
             messages: The messages to send to the OpenAI / DeepSeek API.
-            
+
         Returns:
             The response content from OpenAI / DeepSeek, or None if an error occurs.
         """
@@ -243,7 +243,8 @@ class SelfQA:
             )
             response_message = res.choices[0].message
             if self.is_cot:
-                return "<think>" + response_message.reasoning_content + "</think>" + response_message.content
+                reasoning = getattr(response_message, 'reasoning_content', None) or getattr(response_message, 'reasoning', None) or ''
+                return "<think>" + reasoning + "</think>" + response_message.content
             else:
                 return response_message.content
         except Exception as e:

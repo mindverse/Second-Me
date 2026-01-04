@@ -498,12 +498,13 @@ class DiversityDataGenerator:
             )
             if self.is_cot:
                 response_message = response.choices[0].message
-                res = "<think>" + response_message.reasoning_content + "</think>" + response_message.content
+                reasoning = getattr(response_message, 'reasoning_content', None) or getattr(response_message, 'reasoning', None) or ''
+                res = "<think>" + reasoning + "</think>" + response_message.content
             else:
                 res = response.choices[0].message.content
         except Exception as e:
             logging.error(traceback.format_exc())
-        
+
         # post-processing
         try:
             pattern = r"Question\s*\d+\s*:\s*(.*?)\|\|"
@@ -549,10 +550,11 @@ class DiversityDataGenerator:
             )
             if self.is_cot:
                 response_message = response.choices[0].message
-                res = "<think>" + response_message.reasoning_content + "</think>" + response_message.content
+                reasoning = getattr(response_message, 'reasoning_content', None) or getattr(response_message, 'reasoning', None) or ''
+                res = "<think>" + reasoning + "</think>" + response_message.content
             else:
                 res = response.choices[0].message.content
         except Exception as e:
             logging.error(traceback.format_exc())
-            
+
         return res, answer_type
